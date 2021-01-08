@@ -3,7 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from qpth.qp import QPFunction
+import cvxpy as cp
+from cvxpylayers.torch import CvxpyLayer
+from tqdm import trange
 
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -23,7 +25,7 @@ n_controls = 1
 max_u = 50
 # Express this as a matrix inequality G * u <= h
 G = torch.tensor([[1, -1]]).T
-h = torch.tensor([[max_u, max_u]]).T
+h = torch.tensor([max_u, max_u]).T
 
 
 def f_func(x):
@@ -49,7 +51,7 @@ def g_func(x):
     n_state_dim = x.size()[1]
     n_inputs = 1
     g = torch.zeros(n_batch, n_state_dim, n_inputs)
-    g[:, 1, :] = 1 / m*L**2
+    g[:, 1, :] = 1 / (m*L**2)
 
     return g
 
@@ -87,6 +89,41 @@ class CLF_QP_Net(nn.Module):
         assert G_u.size(0) == h_u.size(0), "G_u and h_u must have consistent dimensions"
         self.G_u = G_u.double()
         self.h_u = h_u.double()
+
+        # To find the control input, we want to solve a QP, so we need to define the QP layer here
+        # The decision variables are the control input and relaxation of the CLF condition
+        u = cp.Variable(self.n_controls)
+        r = cp.Variable(1)
+        # And it's parameterized by the lie derivatives and value of the Lyapunov function
+        L_f_V = cp.Parameter(1)  # this is a scalar
+        L_g_V = cp.Parameter(self.n_controls)  # this is an n_controls-length vector
+        V = cp.Parameter(1)  # also a scalar
+
+        # The QP is constrained by
+        #
+        # L_f V + L_g V u + lambda V <= 0
+        #
+        # To ensure that this QP is always feasible, we relax the constraint
+        #
+        # L_f V + L_g V u + lambda V - r <= 0
+        #                              r >= 0
+        #
+        # and later add the cost term relaxation_penalty * r.
+        constraints = [
+            L_f_V + L_g_V.T @ u + self.clf_lambda * V - r <= 0,
+            r >= 0
+        ]
+        # We also add the user-supplied constraints, if provided
+        if len(self.G_u) > 0:
+            constraints.append(self.G_u @ u <= self.h_u)
+
+        # The cost is quadratic in the controls and linear in the relaxation
+        objective = cp.Minimize(0.5 * cp.sum_squares(u) + self.relaxation_penalty * cp.square(r))
+
+        # Finally, create the optimization problem and the layer based on that
+        problem = cp.Problem(objective, constraints)
+        assert problem.is_dpp()
+        self.qp_layer = CvxpyLayer(problem, parameters=[L_f_V, L_g_V, V], variables=[u, r])
 
     def forward(self, x):
         """
@@ -126,51 +163,8 @@ class CLF_QP_Net(nn.Module):
         L_f_V = torch.bmm(grad_V, f_func(x).unsqueeze(-1))
         L_g_V = torch.bmm(grad_V, g_func(x))
 
-        # To find the control input, we want to solve a QP constrained by
-        #
-        # L_f V + L_g V u + lambda V <= 0
-        #
-        # To ensure that this QP is always feasible, we relax the constraint
-        #
-        # L_f V + L_g V u + lambda V - r <= 0
-        #                              r >= 0
-        #
-        # and add the cost term relaxation_penalty * r.
-        #
-        # The decision variables here are z=[u r], so our quadratic cost is 1/2 z^T Q z + p^T z,
-        # where
-        #           Q = I
-        #           p = [0 relaxation_penalty]
-        #
-        # Expressing the constraints formally:
-        #
-        #       Gz <= h
-        #
-        # where h = [-L_f V - lambda V, 0]^T and G = [L_g V, -1
-        #                                             0,     -1]
-        # We also add the user-specified inequality constraints
-        Q = torch.eye(self.n_controls + 1).double()
-        p = torch.zeros(Q.size(0)).double()
-        p[-1] = self.relaxation_penalty
-        G = torch.zeros(x.size(0), 2 + self.G_u.size(0), self.n_controls + 1).double()
-        G[:, 0, :self.n_controls] = L_g_V.squeeze(1)
-        G[:, 0, -1] = -1
-        G[:, 1, -1] = -1
-        G[:, 2:, :self.n_controls] = self.G_u
-        h = torch.zeros(x.size(0), 2 + self.h_u.size(0), 1)
-        h[:, 0, 0] = -L_f_V.squeeze() - self.clf_lambda * V
-        h[:, 1, 0] = 0.0
-        h[:, 2:, 0] = self.h_u.view(1, self.h_u.size(0))
-        h = h.squeeze()
-        # No equality constraints
-        A = torch.tensor([])
-        b = torch.tensor([])
-
-        # Solve the QP!
-        result = QPFunction(verbose=False)(Q, p, G, h, A, b)
-        # Extract the results
-        u = result[:, :self.n_controls]
-        relaxation = result[:, -1]
+        # To find the control input, we need to solve a QP
+        u, relaxation = self.qp_layer(L_f_V.squeeze(-1), L_g_V.squeeze(-1), V.unsqueeze(-1))
 
         Vdot = L_f_V.squeeze() + L_g_V.squeeze(1) * u
 
@@ -196,10 +190,18 @@ x0 = torch.zeros(1, 2)
 relaxation_penalty = 10
 clf_lambda = 1
 n_hidden = 64
-learning_rate = 0.0001
+learning_rate = 0.001
 momentum = 0.1
 epochs = 100
 batch_size = 64
+
+
+def adjust_learning_rate(optimizer, epoch):
+    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+    lr = learning_rate * (0.5 ** (epoch // 15))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
 
 # Instantiate the network
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty, G, h)
@@ -208,11 +210,15 @@ clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalt
 optimizer = optim.SGD(clf_net.parameters(), lr=learning_rate, momentum=momentum)
 
 # Train!
-epoch_test_losses = []
-epoch_test_max_relaxation = []
-for epoch in range(epochs):
+test_losses = []
+test_max_relaxation = []
+t_epochs = trange(epochs, leave=True)
+for epoch in t_epochs:
     # Randomize presentation order
     permutation = torch.randperm(N_train)
+
+    # Cool learning rate
+    adjust_learning_rate(optimizer, epoch)
 
     loss_acumulated = 0.0
     for i in range(0, N_train, batch_size):
@@ -248,7 +254,7 @@ for epoch in range(epochs):
         optimizer.step()
 
     # Print progress on each epoch, then re-zero accumulated loss for the next epoch
-    print(f'epoch {epoch + 1}, training loss: {loss_acumulated / (N_train / batch_size)}')
+    # print(f'epoch {epoch + 1}, training loss: {loss_acumulated / (N_train / batch_size)}')
     loss_acumulated = 0.0
 
     # Get loss on test set
@@ -261,16 +267,27 @@ for epoch in range(epochs):
         loss += F.relu(0.1*(x_test*x_test).sum(1) - V).max()
         loss += F.relu(0.1*(x_test*x_test).sum(1) - V).mean()
         loss += r.max()
-        print(f"\tTest loss: {loss}")
-        print(f"\tTest max relaxation: {r.max()}")
-        print(f"\tTest max quadratic violation: {F.relu(0.1*(x_test*x_test).sum(1) - V).max()}")
-        epoch_test_losses.append(loss.item())
-        epoch_test_max_relaxation.append(r.max().item())
+        t_epochs.set_description(f"Test loss: {round(loss.item(), 4)}")
+        # print(f"\tTest loss: {loss}")
+        # print(f"\tTest max relaxation: {r.max()}")
+        # print(f"\tTest max quadratic violation: {F.relu(0.1*(x_test*x_test).sum(1) - V).max()}")
+        test_losses.append(loss.item())
+        test_max_relaxation.append(r.max().item())
+
+        # Save the model if it's the best yet
+        filename = 'logs/pendulum_model_best.pth.tar'
+        torch.save({'n_hidden': n_hidden,
+                    'relaxation_penalty': relaxation_penalty,
+                    'G': G,
+                    'h': h,
+                    'clf_lambda': clf_lambda,
+                    'clf_net': clf_net.state_dict(),
+                    'test_losses': test_losses}, filename)
 
 print("Done! Test loss sequence: ")
-print(epoch_test_losses)
+print(test_losses)
 print("Test max relaxation sequence: ")
-print(epoch_test_max_relaxation)
+print(test_max_relaxation)
 
 # Make a grid and plot the relaxation
 with torch.no_grad():
