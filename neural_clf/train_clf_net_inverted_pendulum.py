@@ -131,7 +131,7 @@ class CLF_QP_Net(nn.Module):
         # To find the control input, we need to solve a QP
         u, relaxation = self.qp_layer(L_f_V.squeeze(-1), L_g_V.squeeze(-1), V.unsqueeze(-1))
 
-        Vdot = L_f_V.squeeze() + L_g_V.squeeze(1) * u
+        Vdot = L_f_V.squeeze() + L_g_V.squeeze() * u.squeeze()
 
         return u, relaxation, V, Vdot
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     relaxation_penalty = 10
     clf_lambda = 1
     n_hidden = 64
-    learning_rate = 0.001
+    learning_rate = 0.0005
     momentum = 0.1
     epochs = 100
     batch_size = 64
@@ -232,18 +232,16 @@ if __name__ == "__main__":
             loss += F.relu(0.1*(x_test*x_test).sum(1) - V).mean()
             loss += r.max()
             t_epochs.set_description(f"Test loss: {round(loss.item(), 4)}")
-            # print(f"\tTest loss: {loss}")
-            # print(f"\tTest max relaxation: {r.max()}")
-            # print(f"\tTest max quadratic violation: {F.relu(0.1*(x_test*x_test).sum(1) - V).max()}")
-            test_losses.append(loss.item())
-            test_max_relaxation.append(r.max().item())
 
             # Save the model if it's the best yet
-            filename = 'logs/pendulum_model_best.pth.tar'
-            torch.save({'n_hidden': n_hidden,
-                        'relaxation_penalty': relaxation_penalty,
-                        'G': G,
-                        'h': h,
-                        'clf_lambda': clf_lambda,
-                        'clf_net': clf_net.state_dict(),
-                        'test_losses': test_losses}, filename)
+            if not test_losses or loss.item() < min(test_losses):
+                filename = 'logs/pendulum_model_best.pth.tar'
+                torch.save({'n_hidden': n_hidden,
+                            'relaxation_penalty': relaxation_penalty,
+                            'G': G,
+                            'h': h,
+                            'clf_lambda': clf_lambda,
+                            'clf_net': clf_net.state_dict(),
+                            'test_losses': test_losses}, filename)
+            test_losses.append(loss.item())
+            test_max_relaxation.append(r.max().item())

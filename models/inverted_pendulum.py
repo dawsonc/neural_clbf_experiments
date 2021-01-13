@@ -10,7 +10,7 @@ n_dims = 2
 n_controls = 1
 
 # Define maximum control input
-max_u = 50
+max_u = 20
 # Express this as a matrix inequality G * u <= h
 G = torch.tensor([[1, -1]]).T
 h = torch.tensor([max_u, max_u]).T
