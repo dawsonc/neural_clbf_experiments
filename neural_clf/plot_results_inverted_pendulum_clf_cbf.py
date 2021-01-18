@@ -107,7 +107,7 @@ with torch.no_grad():
     ax.set_ylabel('$\\dot{\\theta}$')
     ax.set_zlabel('$\\dot{H}$')
 
-    plt.show()
+    # plt.show()
 
 # Simulate some results
 with torch.no_grad():

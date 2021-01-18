@@ -22,12 +22,9 @@ torch.set_default_dtype(torch.float64)
 
 
 # Define a neural network class for simultaneously computing the Lyapunov function, barrier function
-# and the control input (a neural net makes the Lyapunov and barrier functions, and the control
-# input is computed by solving a QP)
-class CLF_CBF_QP_Net(nn.Module):
-    def __init__(self, n_input, n_hidden, n_controls, clf_lambda, cbf_lambda,
-                 clf_relaxation_penalty, cbf_relaxation_penalty,
-                 G_u=torch.tensor([]), h_u=torch.tensor([])):
+# and the control input (a neural net makes the Lyapunov, barrier functions, AND the control input
+class LF_BF_QP_Net(nn.Module):
+    def __init__(self, n_input, n_hidden, n_controls, lf_lambda, bf_lambda):
         """
         Initialize the network
 
@@ -35,15 +32,10 @@ class CLF_CBF_QP_Net(nn.Module):
             n_input: number of states the system has
             n_hidden: number of hiddent layers to use
             n_controls: number of control outputs to use
-            clf_lambda: desired exponential convergence rate for CLF
-            cbf_lambda: desired exponential convergence rate for CBF
-            clf_relaxation_penalty: the penalty for relaxing the lyapunov constraint
-            cbf_relaxation_penalty: the penalty for relaxing the barrier constraint
-            G_u: a matrix of constraints on fesaible control inputs (n_constraints x n_controls)
-            h_u: a vector of constraints on fesaible control inputs (n_constraints x 1)
-                Given G_u and h_u, the CLF QP will additionally enforce G_u u <= h_u
+            lf_lambda: desired exponential convergence rate for LF
+            bf_lambda: desired exponential convergence rate for BF
         """
-        super(CLF_CBF_QP_Net, self).__init__()
+        super(LF_BF_QP_Net, self).__init__()
 
         # The network will have the following architecture
         #
@@ -62,64 +54,14 @@ class CLF_CBF_QP_Net(nn.Module):
         self.H_fc_layer_2 = nn.Linear(n_hidden, n_hidden)
         self.H_fc_layer_3 = nn.Linear(n_hidden, 1)
 
+        # Define the layers for the controller
+        self.u_fc_layer_1 = nn.Linear(n_input, n_hidden)
+        self.u_fc_layer_2 = nn.Linear(n_hidden, 1)
+
         # Save any user-supplied functions
         self.n_controls = n_controls
-        self.clf_lambda = clf_lambda
-        self.clf_relaxation_penalty = clf_relaxation_penalty
-        self.cbf_relaxation_penalty = cbf_relaxation_penalty
-        self.cbf_lambda = cbf_lambda
-        assert G_u.size(0) == h_u.size(0), "G_u and h_u must have consistent dimensions"
-        self.G_u = G_u.double()
-        self.h_u = h_u.double()
-
-        # To find the control input, we want to solve a QP, so we need to define the QP layer here
-        # The decision variables are the control input and relaxations of the CLF and CBF condition
-        u = cp.Variable(self.n_controls)
-        r_V = cp.Variable(1)
-        r_H = cp.Variable(1)
-        # And it's parameterized by the lie derivatives and value of the Lyapunov and barrier
-        # functions (provided by the neural network)
-        L_f_V = cp.Parameter(1)  # this is a scalar
-        L_g_V = cp.Parameter(self.n_controls)  # this is an n_controls-length vector
-        V = cp.Parameter(1)  # also a scalar
-        L_f_H = cp.Parameter(1)  # this is a scalar
-        L_g_H = cp.Parameter(self.n_controls)  # this is an n_controls-length vector
-        H = cp.Parameter(1)  # also a scalar
-
-        # The QP is constrained by
-        #
-        # L_f V + L_g V u + lambda V <= 0 (CLF)
-        # L_f H + L_g H u + lambda H >= 0 (CBF, forward invariance of set H(x) >= 0)
-        #
-        # To ensure that this QP is always feasible, we relax the constraint
-        #
-        # L_f V + L_g V u + lambda V - r_V <= 0
-        # L_f H + L_g H u + lambda H + r_H >= 0
-        #                         r_V, r_H >= 0
-        #
-        # and add cost terms to penalize the relaxation
-        # Note that at runtime, we can remove the relaxation r_H to ensure safety.
-        constraints = [
-            L_f_V + L_g_V.T @ u + self.clf_lambda * V - r_V <= 0,
-            L_f_H + L_g_H.T @ u + self.cbf_lambda * H + r_H >= 0,
-            r_V >= 0,
-            r_H >= 0
-        ]
-        # We also add the user-supplied constraints, if provided
-        if len(self.G_u) > 0:
-            constraints.append(self.G_u @ u <= self.h_u)
-
-        # The cost is quadratic in the controls and linear in the relaxation
-        objective = cp.Minimize(0.5 * cp.sum_squares(u)
-                                + self.clf_relaxation_penalty * cp.square(r_V)
-                                + self.cbf_relaxation_penalty * cp.square(r_H))
-
-        # Finally, create the optimization problem and the layer based on that
-        problem = cp.Problem(objective, constraints)
-        assert problem.is_dpp()
-        self.qp_layer = CvxpyLayer(problem,
-                                   parameters=[L_f_V, L_g_V, V, L_f_H, L_g_H, H],
-                                   variables=[u, r_V, r_H])
+        self.lf_lambda = lf_lambda
+        self.bf_lambda = bf_lambda
 
     def forward(self, x):
         """
@@ -145,6 +87,10 @@ class CLF_CBF_QP_Net(nn.Module):
         H_fc1_act = sigmoid(self.H_fc_layer_1(x))
         H_fc2_act = sigmoid(self.H_fc_layer_2(H_fc1_act))
         H = sigmoid(self.H_fc_layer_3(H_fc2_act))
+
+        # And the controlller
+        u_fc1_act = sigmoid(self.u_fc_layer_1(x))
+        u = sigmoid(self.u_fc_layer_2(u_fc1_act))
 
         # We also need to calculate the Lie derivative of V and H along f and g
         #
@@ -184,26 +130,22 @@ class CLF_CBF_QP_Net(nn.Module):
         L_f_H = torch.bmm(grad_H, f_func(x).unsqueeze(-1))
         L_g_H = torch.bmm(grad_H, g_func(x))
 
-        # To find the control input, we need to solve a QP
-        u, r_V, r_H = self.qp_layer(L_f_V.squeeze(-1), L_g_V.squeeze(-1), V.unsqueeze(-1),
-                                    L_f_H.squeeze(-1), L_g_H.squeeze(-1), H)
-
         # Compute the time derivatives
         Vdot = L_f_V.squeeze() + L_g_V.squeeze() * u.squeeze()
         Hdot = L_f_H.squeeze() + L_g_H.squeeze() * u.squeeze()
 
-        return u, r_V, r_H, V, Vdot, H, Hdot
+        return u, V, Vdot, H, Hdot
 
 
 if __name__ == "__main__":
     # Now it's time to learn. First, sample training data uniformly from the state space
-    N_train = 1000
+    N_train = 10000
     theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
     theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
     x_train = torch.cat((theta, theta_dot), 1)
 
     # Also get some testing data, just to be principled
-    N_test = 500
+    N_test = 5000
     theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
     theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
     x_test = torch.cat((theta, theta_dot), 1)
@@ -212,29 +154,25 @@ if __name__ == "__main__":
     x0 = torch.zeros(1, 2)
 
     # Define hyperparameters
-    clf_relaxation_penalty = 10
-    cbf_relaxation_penalty = 20
-    clf_lambda = 1
-    cbf_lambda = 1
-    n_hidden = 32
-    learning_rate = 0.005
-    epochs = 100
-    batch_size = 128
+    lf_lambda = 1
+    bf_lambda = 1
+    n_hidden = 64
+    learning_rate = 0.0001
+    epochs = 500
+    batch_size = 256
 
     def adjust_learning_rate(optimizer, epoch):
         """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-        lr = learning_rate * (0.5 ** (epoch // 10))
+        lr = learning_rate * (0.8 ** (epoch // 20))
         for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
+            param_group['lr'] = max(lr, 5e-6)
 
     # Instantiate the network
-    clf_cbf_net = CLF_CBF_QP_Net(n_dims, n_hidden, n_controls,
-                                 clf_lambda, cbf_lambda,
-                                 clf_relaxation_penalty, cbf_relaxation_penalty,
-                                 G, h)
+    lf_bf_net = LF_BF_QP_Net(n_dims, n_hidden, n_controls,
+                             lf_lambda, bf_lambda)
 
     # Initialize the optimizer
-    optimizer = optim.Adam(clf_cbf_net.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(lf_bf_net.parameters(), lr=learning_rate)
 
     # Train!
     test_losses = []
@@ -256,32 +194,34 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # Forward pass: compute the control input and required Lyapunov relaxation
-            u, r_V, r_H, V, _, H, Hdot = clf_cbf_net(x)
+            u, V, Vdot, H, Hdot = lf_bf_net(x)
             # Also get the Lyapunov function value at the origin
-            _, _, _, V0, _, _, _ = clf_cbf_net(x0)
+            _, V0, _, _, _ = lf_bf_net(x0)
 
             # Compute loss based on...
             loss = 0.0
-            #   1.) mean and max Lyapunov relaxation
-            loss += r_V.mean() + r_V.max()
-            #   2.) mean and max barrier function relaxation
-            loss += r_H.mean() + r_H.max()
-            #   3.) squared value of the Lyapunov function at the origin
+            #   1.) squared value of the Lyapunov function at the origin
             loss += V0.pow(2).squeeze()
-            #   4.) mean and max ReLU to encourage V >= x^Tx
+            #   2.) mean and max ReLU to encourage V >= x^Tx
             lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
             loss += lyap_tuning_term.mean() + lyap_tuning_term.max()
-            #   5.) mean and max ReLU to encourage H > 0 in safe set
+            #   3.) mean and max violation of the Lyapunov condition
+            lyap_violation = F.relu(Vdot + lf_lambda * V)
+            loss += lyap_violation.mean() + lyap_violation.max()
+            #   4.) mean and max ReLU to encourage H > 0 in safe set
             safe_filter = x[:, 0] ** 2 + x[:, 1]**2 <= 1
             eps = 0.0
             H_safe = F.relu(eps-H[safe_filter])
             if H_safe.nelement() > 0:
                 loss += H_safe.mean() + H_safe.max()
-            #   6.) mean and max ReLU to encourage H < 0 in unsafe set
+            #   5.) mean and max ReLU to encourage H < 0 in unsafe set
             unsafe_filter = x[:, 0] ** 2 + x[:, 1]**2 >= 1
             H_unsafe = F.relu(H[unsafe_filter] + eps)
             if H_unsafe.nelement() > 0:
                 loss += H_unsafe.mean() + H_unsafe.max()
+            #   6.) mean and max violation of the barrier function condition
+            barrier_violation = F.relu(-Hdot - bf_lambda * H)
+            loss += barrier_violation.mean() + barrier_violation.max()
 
             # Accumulate loss from this epoch and do backprop
             loss_acumulated += loss
@@ -297,43 +237,45 @@ if __name__ == "__main__":
         # Get loss on test set
         with torch.no_grad():
             # Forward pass: compute the control input and required Lyapunov relaxation
-            u, r_V, r_H, V, _, H, Hdot = clf_cbf_net(x_test)
+            u, V, Vdot, H, Hdot = lf_bf_net(x_test)
             # Also get the Lyapunov function value at the origin
-            _, _, _, V0, _, _, _ = clf_cbf_net(x0)
+            _, V0, _, _, _ = lf_bf_net(x0)
 
             # Compute loss based on...
             loss = 0.0
-            #   1.) mean and max Lyapunov relaxation
-            loss += r_V.mean() + r_V.max()
-            #   2.) mean and max barrier function relaxation
-            loss += r_H.mean() + r_H.max()
-            #   3.) squared value of the Lyapunov function at the origin
+            #   1.) squared value of the Lyapunov function at the origin
             loss += V0.pow(2).squeeze()
-            #   4.) mean and max ReLU to encourage V >= x^Tx
+            #   2.) mean and max ReLU to encourage V >= x^Tx
             lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
             loss += lyap_tuning_term.mean() + lyap_tuning_term.max()
-            #   5.) mean and max ReLU to encourage H > 0 in safe set
+            #   3.) mean and max violation of the Lyapunov condition
+            lyap_violation = F.relu(Vdot + lf_lambda * V)
+            loss += lyap_violation.mean() + lyap_violation.max()
+            #   4.) mean and max ReLU to encourage H > 0 in safe set
             safe_filter = x_test[:, 0] ** 2 + x_test[:, 1]**2 <= 1
-            eps = 0.001
+            eps = 0.0
             H_safe = F.relu(eps-H[safe_filter])
-            loss -= H_safe.mean() + H_safe.max()
-            #   6.) mean and max ReLU to encourage H < 0 in unsafe set
+            if H_safe.nelement() > 0:
+                loss += H_safe.mean() + H_safe.max()
+            #   5.) mean and max ReLU to encourage H < 0 in unsafe set
             unsafe_filter = x_test[:, 0] ** 2 + x_test[:, 1]**2 >= 1
             H_unsafe = F.relu(H[unsafe_filter] + eps)
-            loss += H_unsafe.mean() + H_unsafe.max()
+            if H_unsafe.nelement() > 0:
+                loss += H_unsafe.mean() + H_unsafe.max()
+            #   6.) mean and max violation of the barrier function condition
+            barrier_violation = F.relu(-Hdot - bf_lambda * H)
+            loss += barrier_violation.mean() + barrier_violation.max()
 
             t_epochs.set_description(f"Test loss: {round(loss.item(), 4)}")
 
             # Save the model if it's the best yet
             if not test_losses or loss.item() < min(test_losses):
-                filename = 'logs/pendulum_model_best_clf_cbf.pth.tar'
+                filename = 'logs/pendulum_model_best_lf_bf.pth.tar'
                 torch.save({'n_hidden': n_hidden,
-                            'clf_relaxation_penalty': clf_relaxation_penalty,
-                            'cbf_relaxation_penalty': cbf_relaxation_penalty,
                             'G': G,
                             'h': h,
-                            'clf_lambda': clf_lambda,
-                            'cbf_lambda': cbf_lambda,
-                            'clf_cbf_net': clf_cbf_net.state_dict(),
+                            'lf_lambda': lf_lambda,
+                            'bf_lambda': bf_lambda,
+                            'lf_bf_net': lf_bf_net.state_dict(),
                             'test_losses': test_losses}, filename)
             test_losses.append(loss.item())
