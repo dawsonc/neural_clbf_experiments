@@ -30,7 +30,7 @@ clf_net = CLF_QP_Net(n_dims,
 clf_net.load_state_dict(checkpoint['clf_net'])
 
 with torch.no_grad():
-    n_grid = 50
+    n_grid = 30
     x = torch.linspace(-1, 1, n_grid)
     y = torch.linspace(-1, 1, n_grid)
     grid_x, grid_y = torch.meshgrid(x, y)
@@ -49,13 +49,13 @@ with torch.no_grad():
             V_values[i, j] = V
             V_dot_values[i, j] = V_dot
 
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.plot_surface(grid_x, grid_y, residuals.numpy(),
-                    rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
-    ax.set_xlabel('$x$')
-    ax.set_ylabel('$y$')
-    ax.set_zlabel('Residual')
+    # fig = plt.figure()
+    # ax = fig.gca(projection='3d')
+    # ax.plot_surface(grid_x, grid_y, residuals.numpy(),
+    #                 rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
+    # ax.set_xlabel('$x$')
+    # ax.set_ylabel('$y$')
+    # ax.set_zlabel('Residual')
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
@@ -80,14 +80,14 @@ with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = 0.2
-    x_sim_start[:, 1] = 0.0
+    x_sim_start[:, 1] = 0.2
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
 
-    t_sim = 0.5
-    delta_t = 0.001
+    t_sim = 5
+    delta_t = 0.01
     num_timesteps = int(t_sim // delta_t)
     x_sim = torch.zeros(num_timesteps, N_sim, n_dims)
     u_sim = torch.zeros(num_timesteps, N_sim, n_controls)
@@ -113,7 +113,7 @@ with torch.no_grad():
 
             # if Vdot > 0:
             #     import pdb; pdb.set_trace()
-            V_last = V[i]
+            # V_last = V[i]
 
         u_sim[tstep, :, :] = u
         V_sim[tstep, :, 0] = V
@@ -121,24 +121,19 @@ with torch.no_grad():
         r_sim[tstep, :, 0] = r
 
     t = np.linspace(0, t_sim, num_timesteps)
-    ax = plt.subplot(6, 1, 1)
-    ax.plot(t, x_sim[:, 0, :3])
+    ax = plt.subplot(4, 1, 1)
+    ax.plot(t, x_sim[:, 0, :3].norm(dim=-1))
     ax.set_xlabel("$t$")
-    ax.set_ylabel("$x, y, theta$")
-    ax.legend(["x", "y", "theta"])
-    ax = plt.subplot(6, 1, 2)
-    ax.plot(t, x_sim[:, 0, 3:])
-    ax.set_xlabel("$t$")
-    ax.set_ylabel("$x, y, theta dot$")
-    ax = plt.subplot(6, 1, 4)
+    ax.set_ylabel("$||q||$")
+    ax = plt.subplot(4, 1, 2)
     ax.plot(t[1:], V_sim[1:, :, 0], 'o')
     ax.set_xlabel("$t$")
     ax.set_ylabel("$V$")
-    ax = plt.subplot(6, 1, 5)
+    ax = plt.subplot(4, 1, 3)
     ax.plot(t[1:], Vdot_sim[1:, :, 0], 'o')
     ax.set_xlabel("$t$")
     ax.set_ylabel("$Vdot$")
-    ax = plt.subplot(6, 1, 6)
+    ax = plt.subplot(4, 1, 4)
     ax.plot(t[1:], u_sim[1:, 0, :])
     ax.set_xlabel("$t$")
     ax.set_ylabel("$u$")

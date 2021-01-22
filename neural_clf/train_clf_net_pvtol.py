@@ -54,10 +54,6 @@ class CLF_QP_Net(nn.Module):
         self.Vfc_layer_1 = nn.Linear(n_input, n_hidden)
         self.Vfc_layer_2 = nn.Linear(n_hidden, n_hidden)
 
-        # We also use a NN to compute a nominal control input
-        self.Ufc_layer_1 = nn.Linear(n_input, n_hidden)
-        self.Ufc_layer_2 = nn.Linear(n_hidden, n_controls)
-
         self.n_controls = n_controls
         self.clf_lambda = clf_lambda
         self.relaxation_penalty = relaxation_penalty
@@ -134,9 +130,10 @@ class CLF_QP_Net(nn.Module):
         Vfc2_act = tanh(self.Vfc_layer_2(Vfc1_act))
         V = 0.5 * (Vfc2_act * Vfc2_act).sum(1)
 
-        # Also compute the nominal controller
-        Ufc1_act = tanh(self.Ufc_layer_1(x))
-        u_nominal = tanh(self.Ufc_layer_2(Ufc1_act))
+        # Also compute the nominal control input based on LQR
+        K = torch.tensor([[10.0, -5.77350269, -13.90968899, 6.19339838, -2.47775213, -0.78165452],
+                          [-10.0, -5.77350269, 13.90968899, -6.19339838, -2.47775213, 0.78165452]])
+        u_nominal = torch.matmul(K, x.T).T
 
         # We also need to calculate the Lie derivative of V along f and g
         #
@@ -159,13 +156,12 @@ class CLF_QP_Net(nn.Module):
         L_g_V_low = torch.bmm(grad_V, g_func(x, m=low_m, inertia=low_I))
 
         # To find the control input, we need to solve a QP
-        u = u_nominal
-        # u, r_low = self.qp_layer(
-        #     L_f_V_low.squeeze(-1), L_g_V_low.squeeze(1),
-        #     V.unsqueeze(-1),
-        #     u_nominal,
-        #     torch.tensor([self.relaxation_penalty]),
-        #     solver_args={"max_iters": 50000})
+        u, r_low = self.qp_layer(
+            L_f_V_low.squeeze(-1), L_g_V_low.squeeze(1),
+            V.unsqueeze(-1),
+            u_nominal,
+            torch.tensor([self.relaxation_penalty]),
+            solver_args={"max_iters": 50000})
 
         Vdot_low = L_f_V_low + torch.bmm(L_g_V_low, u.unsqueeze(-1))
 
@@ -192,7 +188,7 @@ class CLF_QP_Net(nn.Module):
 
 if __name__ == "__main__":
     # Now it's time to learn. First, sample training data uniformly from the state space
-    N_train = 100000
+    N_train = 1000
     xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
     xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
     theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -200,7 +196,7 @@ if __name__ == "__main__":
     x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 
     # Also get some testing data, just to be principled
-    N_test = 10000
+    N_test = 500
     xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
     xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
     theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
@@ -233,7 +229,7 @@ if __name__ == "__main__":
     # Instantiate the network
     # clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty, G, h)
     clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
-                         allow_relax=True)
+                         allow_relax=False)
 
     # Initialize the optimizer
     optimizer = optim.SGD(clf_net.parameters(), lr=learning_rate, momentum=0.1)
@@ -266,7 +262,7 @@ if __name__ == "__main__":
             # Compute loss based on...
             loss = 0.0
             #   1.) mean and max Lyapunov relaxation
-            # loss += r.mean()
+            loss += r.mean()
             #   3.) squared value of the Lyapunov function at the origin
             loss += V0.pow(2).squeeze()
             #   4.) mean and max ReLU to encourage V >= x^Tx
@@ -274,7 +270,7 @@ if __name__ == "__main__":
             # loss += lyap_tuning_term.mean()
             #   5.) term to encourage satisfaction of CLF condition
             lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-            loss += lyap_descent_term.mean() + lyap_descent_term.max()
+            loss += lyap_descent_term.mean()
             #   6.) encourage small-magnitude controls
             # loss += (u*u).mean()
 
@@ -297,7 +293,7 @@ if __name__ == "__main__":
             # Compute loss based on...
             loss = 0.0
             #   1.) mean and max Lyapunov relaxation
-            # loss += r.mean()
+            loss += r.mean()
             #   3.) squared value of the Lyapunov function at the origin
             loss += V0.pow(2).squeeze()
             #   4.) mean and max ReLU to encourage V >= x^Tx
@@ -305,7 +301,7 @@ if __name__ == "__main__":
             # loss += lyap_tuning_term.mean()
             #   5.) term to encourage satisfaction of CLF condition
             lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-            loss += lyap_descent_term.mean() + lyap_descent_term.max()
+            loss += lyap_descent_term.mean()
             #   6.) encourage small-magnitude controls
             # loss += (u*u).mean()
 
@@ -314,7 +310,6 @@ if __name__ == "__main__":
             print(f"                         origin: {V0.pow(2).squeeze().item()}")
             print(f"                    tuning term: {lyap_tuning_term.mean().item()}")
             print(f"                   descent term: {lyap_descent_term.mean().item()} (mean)")
-            print(f"                   descent term: {lyap_descent_term.max().item()} (max)")
             print(f"                   control term: {(u*u).mean().item()}")
 
             # Save the model if it's the best yet
