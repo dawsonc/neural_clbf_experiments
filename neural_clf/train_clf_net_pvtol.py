@@ -12,7 +12,6 @@ from tqdm import trange
 from models.pvtol import (
     f_func,
     g_func,
-    nominal_control,
     n_controls,
     n_dims,
     G,
@@ -50,10 +49,14 @@ class CLF_QP_Net(nn.Module):
 
         # The network will have the following architecture
         #
-        # n_input -> FC1 (n_input x n_hidden) -> FC2 (n_hidden, n_hidden)
-        # -> FC2 (n_hidden, n_hidden) -> V = x^T x --> QP -> u
-        self.fc_layer_1 = nn.Linear(n_input, n_hidden)
-        self.fc_layer_2 = nn.Linear(n_hidden, n_hidden)
+        # n_input -> VFC1 (n_input x n_hidden) -> VFC2 (n_hidden, n_hidden)
+        # -> VFC2 (n_hidden, n_hidden) -> V = x^T x --> QP -> u
+        self.Vfc_layer_1 = nn.Linear(n_input, n_hidden)
+        self.Vfc_layer_2 = nn.Linear(n_hidden, n_hidden)
+
+        # We also use a NN to compute a nominal control input
+        self.Ufc_layer_1 = nn.Linear(n_input, n_hidden)
+        self.Ufc_layer_2 = nn.Linear(n_hidden, n_controls)
 
         self.n_controls = n_controls
         self.clf_lambda = clf_lambda
@@ -127,9 +130,13 @@ class CLF_QP_Net(nn.Module):
         """
         # Use the first two layers to compute the Lyapunov function
         tanh = nn.Tanh()
-        fc1_act = tanh(self.fc_layer_1(x))
-        fc2_act = tanh(self.fc_layer_2(fc1_act))
-        V = 0.5 * (fc2_act * fc2_act).sum(1)
+        Vfc1_act = tanh(self.Vfc_layer_1(x))
+        Vfc2_act = tanh(self.Vfc_layer_2(Vfc1_act))
+        V = 0.5 * (Vfc2_act * Vfc2_act).sum(1)
+
+        # Also compute the nominal controller
+        Ufc1_act = tanh(self.Ufc_layer_1(x))
+        u_nominal = tanh(self.Ufc_layer_2(Ufc1_act))
 
         # We also need to calculate the Lie derivative of V along f and g
         #
@@ -142,28 +149,29 @@ class CLF_QP_Net(nn.Module):
             return torch.diag_embed(1 - tanh**2)
 
         # Jacobian of first layer wrt input (n_batch x n_hidden x n_input)
-        Dfc1_act = torch.matmul(d_tanh_dx(fc1_act), self.fc_layer_1.weight)
+        DVfc1_act = torch.matmul(d_tanh_dx(Vfc1_act), self.Vfc_layer_1.weight)
         # Jacobian of second layer wrt input (n_batch x n_hidden x n_input)
-        Dfc2_act = torch.bmm(torch.matmul(d_tanh_dx(fc2_act), self.fc_layer_2.weight), Dfc1_act)
+        DVfc2_act = torch.bmm(torch.matmul(d_tanh_dx(Vfc2_act), self.Vfc_layer_2.weight), DVfc1_act)
         # Gradient of V wrt input (n_batch x 1 x n_input)
-        grad_V = torch.bmm(fc2_act.unsqueeze(1), Dfc2_act)
+        grad_V = torch.bmm(Vfc2_act.unsqueeze(1), DVfc2_act)
 
         L_f_V_low = torch.bmm(grad_V, f_func(x, m=low_m, inertia=low_I).unsqueeze(-1))
         L_g_V_low = torch.bmm(grad_V, g_func(x, m=low_m, inertia=low_I))
 
         # To find the control input, we need to solve a QP
-        u, r_low = self.qp_layer(
-            L_f_V_low.squeeze(-1), L_g_V_low.squeeze(1),
-            V.unsqueeze(-1),
-            nominal_control(x).squeeze(-1),
-            torch.tensor([self.relaxation_penalty]),
-            solver_args={"max_iters": 50000})
+        u = u_nominal
+        # u, r_low = self.qp_layer(
+        #     L_f_V_low.squeeze(-1), L_g_V_low.squeeze(1),
+        #     V.unsqueeze(-1),
+        #     u_nominal,
+        #     torch.tensor([self.relaxation_penalty]),
+        #     solver_args={"max_iters": 50000})
 
         Vdot_low = L_f_V_low + torch.bmm(L_g_V_low, u.unsqueeze(-1))
 
         # Average across scenarios
         Vdot = Vdot_low
-        relaxation = r_low
+        relaxation = torch.tensor([[0.0]])  # r_low
 
         # if torch.allclose(x, torch.tensor([[0.2000, -0.0279,  0.0107, -0.0078, -0.7441,  0.3272]]), atol=0.001):
         #     f_val = f_func(x, m=low_m, inertia=low_I)
@@ -173,9 +181,9 @@ class CLF_QP_Net(nn.Module):
         #     x_next = x + dt * expected_xdot
         #     dx = dt * torch.ones_like(x_next)
         #     dx = dt * expected_xdot
-        #     fc1_act = tanh(self.fc_layer_1(x + dx))
-        #     fc2_act = tanh(self.fc_layer_2(fc1_act))
-        #     V_next = 0.5 * (fc2_act * fc2_act).sum(1)
+        #     Vfc1_act = tanh(self.Vfc_layer_1(x + dx))
+        #     Vfc2_act = tanh(self.Vfc_layer_2(Vfc1_act))
+        #     V_next = 00.5 * (Vfc2_act * Vfc2_act).sum(1)
         #     dV = V_next - V
         #     import pdb; pdb.set_trace()
 
@@ -184,19 +192,19 @@ class CLF_QP_Net(nn.Module):
 
 if __name__ == "__main__":
     # Now it's time to learn. First, sample training data uniformly from the state space
-    N_train = 500
+    N_train = 100000
     xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
     xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
-    theta = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
-    theta_dot = torch.Tensor(N_train, 1).uniform_(-4*np.pi, 4*np.pi)
+    theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
+    theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
     x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 
     # Also get some testing data, just to be principled
-    N_test = 500
+    N_test = 10000
     xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
     xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
-    theta = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
-    theta_dot = torch.Tensor(N_test, 1).uniform_(-4*np.pi, 4*np.pi)
+    theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
+    theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
     x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 
     # Create a tensor for the origin as well
@@ -205,16 +213,16 @@ if __name__ == "__main__":
     # Define hyperparameters
     relaxation_penalty = 1.0
     clf_lambda = 1
-    n_hidden = 32
-    learning_rate = 0.01
-    epochs = 100
+    n_hidden = 48
+    learning_rate = 0.001
+    epochs = 1000
     batch_size = 64
 
     def adjust_learning_rate(optimizer, epoch):
         """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-        lr = learning_rate * (0.5 ** (epoch // 10))
+        lr = learning_rate * (1 ** (epoch // 10))
         for param_group in optimizer.param_groups:
-            param_group['lr'] = max(lr, 1e-6)
+            param_group['lr'] = max(lr, 1e-3)
 
     # We start by allowing the QP to relax the CLF condition, but we'll gradually increase the
     # cost of doing so.
@@ -258,15 +266,17 @@ if __name__ == "__main__":
             # Compute loss based on...
             loss = 0.0
             #   1.) mean and max Lyapunov relaxation
-            loss += r.mean()  # + r.max()
+            # loss += r.mean()
             #   3.) squared value of the Lyapunov function at the origin
             loss += V0.pow(2).squeeze()
             #   4.) mean and max ReLU to encourage V >= x^Tx
             lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-            loss += lyap_tuning_term.mean()  # + lyap_tuning_term.max()
+            # loss += lyap_tuning_term.mean()
             #   5.) term to encourage satisfaction of CLF condition
             lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-            loss += lyap_descent_term.mean()  # + lyap_descent_term.max()
+            loss += lyap_descent_term.mean() + lyap_descent_term.max()
+            #   6.) encourage small-magnitude controls
+            # loss += (u*u).mean()
 
             # Accumulate loss from this epoch and do backprop
             loss.backward()
@@ -287,21 +297,25 @@ if __name__ == "__main__":
             # Compute loss based on...
             loss = 0.0
             #   1.) mean and max Lyapunov relaxation
-            loss += r.mean()  # + r.max()
+            # loss += r.mean()
             #   3.) squared value of the Lyapunov function at the origin
             loss += V0.pow(2).squeeze()
             #   4.) mean and max ReLU to encourage V >= x^Tx
             lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
-            loss += lyap_tuning_term.mean()  # + lyap_tuning_term.max()
+            # loss += lyap_tuning_term.mean()
             #   5.) term to encourage satisfaction of CLF condition
             lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-            loss += lyap_descent_term.mean()  # + lyap_descent_term.max()
+            loss += lyap_descent_term.mean() + lyap_descent_term.max()
+            #   6.) encourage small-magnitude controls
+            # loss += (u*u).mean()
 
             print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
             print(f"                     relaxation: {r.mean().item()}")
             print(f"                         origin: {V0.pow(2).squeeze().item()}")
             print(f"                    tuning term: {lyap_tuning_term.mean().item()}")
-            print(f"                   descent term: {lyap_descent_term.mean().item()}")
+            print(f"                   descent term: {lyap_descent_term.mean().item()} (mean)")
+            print(f"                   descent term: {lyap_descent_term.max().item()} (max)")
+            print(f"                   control term: {(u*u).mean().item()}")
 
             # Save the model if it's the best yet
             if not test_losses or loss.item() < min(test_losses):

@@ -24,57 +24,56 @@ checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims,
                      checkpoint['n_hidden'],
                      n_controls,
-                     0*checkpoint['clf_lambda'],
+                     checkpoint['clf_lambda'],
                      checkpoint['relaxation_penalty'],
                      allow_relax=False)
 clf_net.load_state_dict(checkpoint['clf_net'])
 
-# with torch.no_grad():
-#     n_grid = 20
-#     x = torch.linspace(-4, 4, n_grid)
-#     y = torch.linspace(-4, 4, n_grid)
-#     grid_x, grid_y = torch.meshgrid(x, y)
-#     residuals = torch.zeros(n_grid, n_grid)
-#     V_values = torch.zeros(n_grid, n_grid)
-#     V_dot_values = torch.zeros(n_grid, n_grid)
-#     print("Plotting V on grid...")
-#     for i in tqdm(range(n_grid)):
-#         for j in range(n_grid):
-#             # Get the residual from running the model
-#             q = torch.zeros(1, n_dims)
-#             q = torch.tensor([[0.2000, -0.0279,  0.0107, -0.0078, -0.7441,  0.3272]])
-#             q[0, 0] = x[i]
-#             q[0, 1] = y[j]
-#             _, r, V, V_dot = clf_net(q)
-#             residuals[i, j] = r
-#             V_values[i, j] = V
-#             V_dot_values[i, j] = V_dot
+with torch.no_grad():
+    n_grid = 50
+    x = torch.linspace(-1, 1, n_grid)
+    y = torch.linspace(-1, 1, n_grid)
+    grid_x, grid_y = torch.meshgrid(x, y)
+    residuals = torch.zeros(n_grid, n_grid)
+    V_values = torch.zeros(n_grid, n_grid)
+    V_dot_values = torch.zeros(n_grid, n_grid)
+    print("Plotting V on grid...")
+    for i in tqdm(range(n_grid)):
+        for j in range(n_grid):
+            # Get the residual from running the model
+            q = torch.zeros(1, n_dims)
+            q[0, 0] = x[i]
+            q[0, 1] = y[j]
+            _, r, V, V_dot = clf_net(q)
+            residuals[i, j] = r
+            V_values[i, j] = V
+            V_dot_values[i, j] = V_dot
 
-#     fig = plt.figure()
-#     ax = fig.gca(projection='3d')
-#     ax.plot_surface(grid_x, grid_y, residuals.numpy(),
-#                     rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
-#     ax.set_xlabel('$x$')
-#     ax.set_ylabel('$y$')
-#     ax.set_zlabel('Residual')
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.plot_surface(grid_x, grid_y, residuals.numpy(),
+                    rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$y$')
+    ax.set_zlabel('Residual')
 
-#     fig = plt.figure()
-#     ax = fig.gca(projection='3d')
-#     ax.plot_surface(grid_x, grid_y, V_values.numpy(),
-#                     rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
-#     ax.set_xlabel('$x$')
-#     ax.set_ylabel('$y$')
-#     ax.set_zlabel('$V$')
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.plot_surface(grid_x, grid_y, V_values.numpy(),
+                    rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$y$')
+    ax.set_zlabel('$V$')
 
-#     fig = plt.figure()
-#     ax = fig.gca(projection='3d')
-#     ax.plot_surface(grid_x, grid_y, V_dot_values.numpy(),
-#                     rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
-#     ax.set_xlabel('$x$')
-#     ax.set_ylabel('$y$')
-#     ax.set_zlabel('$\\dot{V}$')
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.plot_surface(grid_x, grid_y, V_dot_values.numpy(),
+                    rstride=1, cstride=1, alpha=0.5, cmap=cm.coolwarm)
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$y$')
+    ax.set_zlabel('$\\dot{V}$')
 
-#     plt.show()
+    plt.show()
 
 # Simulate some results
 with torch.no_grad():
@@ -87,7 +86,7 @@ with torch.no_grad():
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
 
-    t_sim = 0.1
+    t_sim = 0.5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
     x_sim = torch.zeros(num_timesteps, N_sim, n_dims)
@@ -112,7 +111,7 @@ with torch.no_grad():
             xdot = f_val + g_val @ u[i, :]
             x_sim[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
-            # if V[i] - V_last > 1:
+            # if Vdot > 0:
             #     import pdb; pdb.set_trace()
             V_last = V[i]
 
@@ -123,17 +122,14 @@ with torch.no_grad():
 
     t = np.linspace(0, t_sim, num_timesteps)
     ax = plt.subplot(6, 1, 1)
-    ax.plot(t, x_sim[:, :, 0])
+    ax.plot(t, x_sim[:, 0, :3])
     ax.set_xlabel("$t$")
-    ax.set_ylabel("$x$")
+    ax.set_ylabel("$x, y, theta$")
+    ax.legend(["x", "y", "theta"])
     ax = plt.subplot(6, 1, 2)
-    ax.plot(t, x_sim[:, :, 1])
+    ax.plot(t, x_sim[:, 0, 3:])
     ax.set_xlabel("$t$")
-    ax.set_ylabel("$y$")
-    ax = plt.subplot(6, 1, 3)
-    ax.plot(t, x_sim[:, :, 2])
-    ax.set_xlabel("$t$")
-    ax.set_ylabel("$\\theta$")
+    ax.set_ylabel("$x, y, theta dot$")
     ax = plt.subplot(6, 1, 4)
     ax.plot(t[1:], V_sim[1:, :, 0], 'o')
     ax.set_xlabel("$t$")

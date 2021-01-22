@@ -43,12 +43,12 @@ def f_func(x, m=low_m, inertia=low_I):
     # x is batched, so has dimensions [n_batches, 2]. Compute x_dot for each bit
     f = torch.zeros(x.size())
 
-    f[:, 0] = x[:, 3] * torch.cos(x[:, 2]) - x[:, 4] * torch.sin(x[:, 2])
-    f[:, 1] = x[:, 3] * torch.sin(x[:, 2]) + x[:, 4] * torch.cos(x[:, 2])
+    f[:, 0] = x[:, 3]
+    f[:, 1] = x[:, 4]
     f[:, 2] = x[:, 5]
-    f[:, 3] = x[:, 4] * x[:, 5] - g * torch.sin(x[:, 2])
-    f[:, 4] = x[:, 3] * x[:, 5] - g * torch.cos(x[:, 2])
-    f[:, 5] = 0
+    f[:, 3] = 0.0
+    f[:, 4] = - g
+    f[:, 5] = 0.0
 
     return f
 
@@ -61,28 +61,16 @@ def g_func(x, m=low_m, inertia=low_I):
     n_state_dim = x.size()[1]
     g = torch.zeros(n_batch, n_state_dim, n_controls)
 
-    # The first four coordinates have no input from control
+    # Effect on x acceleration
+    g[:, 3, 0] = -torch.sin(x[:, 2]) / m
+    g[:, 3, 1] = -torch.sin(x[:, 2]) / m
 
-    # Effect on vehicle-frame vertical velocity from rotors
-    g[:, 4, 0] = 1 / m
-    g[:, 4, 1] = 1 / m
+    # Effect on y acceleration
+    g[:, 4, 0] = torch.cos(x[:, 2]) / m
+    g[:, 4, 1] = torch.cos(x[:, 2]) / m
 
     # Effect on heading from rotors
     g[:, 5, 0] = r / inertia
     g[:, 5, 1] = -r / inertia
 
     return g
-
-
-def nominal_control(x, m=low_m, inertia=low_I):
-    """
-    Return a nominal control input for the system
-    """
-    n_batch = x.size()[0]
-    u = torch.zeros(n_batch, n_controls, 1)
-
-    # Add a simple nominal control input to cancel the gravitational force
-    u[:, 0, 0] = m * g * torch.cos(x[:, 2])
-    u[:, 1, 0] = m * g * torch.cos(x[:, 2])
-
-    return u
