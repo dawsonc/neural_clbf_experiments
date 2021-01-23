@@ -65,10 +65,19 @@ class CLF_QP_Net(nn.Module):
         # The decision variables are the control input and relaxation of the CLF condition
         u = cp.Variable(self.n_controls)
         r_low = cp.Variable(1)
+        r_high = cp.Variable(1)
+        r_high_m = cp.Variable(1)
+        r_high_I = cp.Variable(1)
         # And it's parameterized by the lie derivatives and value of the Lyapunov function
-        L_f_V_low = cp.Parameter(1)  # this is a scalar
-        L_g_V_low = cp.Parameter(self.n_controls)  # this is an n_controls-length vector
-        V = cp.Parameter(1, nonneg=True)  # also a scalar
+        L_f_V_low = cp.Parameter(1)
+        L_g_V_low = cp.Parameter(self.n_controls)
+        L_f_V_high = cp.Parameter(1)
+        L_g_V_high = cp.Parameter(self.n_controls)
+        L_f_V_high_m = cp.Parameter(1)
+        L_g_V_high_m = cp.Parameter(self.n_controls)
+        L_f_V_high_I = cp.Parameter(1)
+        L_g_V_high_I = cp.Parameter(self.n_controls)
+        V = cp.Parameter(1, nonneg=True)
         # To allow for gradual increasing of the cost of relaxations, set the relaxation penalty
         # as a parameter as well
         relaxation_penalty_param = cp.Parameter(1, nonneg=True)
@@ -92,10 +101,19 @@ class CLF_QP_Net(nn.Module):
             constraints = [
                 L_f_V_low + L_g_V_low @ u + self.clf_lambda * V - r_low <= 0,
                 r_low >= 0,
+                L_f_V_high + L_g_V_high @ u + self.clf_lambda * V - r_high <= 0,
+                r_high >= 0,
+                L_f_V_high_m + L_g_V_high_m @ u + self.clf_lambda * V - r_high_m <= 0,
+                r_high_m >= 0,
+                L_f_V_high_I + L_g_V_high_I @ u + self.clf_lambda * V - r_high_I <= 0,
+                r_high_I >= 0,
             ]
         else:
             constraints = [
                 L_f_V_low + L_g_V_low @ u + self.clf_lambda * V <= 0,
+                L_f_V_high + L_g_V_high @ u + self.clf_lambda * V <= 0,
+                L_f_V_high_m + L_g_V_high_m @ u + self.clf_lambda * V <= 0,
+                L_f_V_high_I + L_g_V_high_I @ u + self.clf_lambda * V <= 0,
             ]
         # We also add the user-supplied constraints, if provided
         if len(self.G_u) > 0:
@@ -103,13 +121,19 @@ class CLF_QP_Net(nn.Module):
 
         # The cost is quadratic in the controls and linear in the relaxation
         objective = cp.Minimize(0.5 * cp.sum_squares(u - u_nominal)
-                                + cp.multiply(relaxation_penalty_param, cp.square(r_low)))
+                                + cp.multiply(relaxation_penalty_param, cp.square(r_low))
+                                + cp.multiply(relaxation_penalty_param, cp.square(r_high))
+                                + cp.multiply(relaxation_penalty_param, cp.square(r_high_m))
+                                + cp.multiply(relaxation_penalty_param, cp.square(r_high_I)))
 
         # Finally, create the optimization problem and the layer based on that
         problem = cp.Problem(objective, constraints)
         assert problem.is_dpp()
-        self.qp_layer = CvxpyLayer(problem, variables=[u, r_low],
+        self.qp_layer = CvxpyLayer(problem, variables=[u, r_low, r_high, r_high_m, r_high_I],
                                    parameters=[L_f_V_low, L_g_V_low,
+                                               L_f_V_high, L_g_V_high,
+                                               L_f_V_high_m, L_g_V_high_m,
+                                               L_f_V_high_I, L_g_V_high_I,
                                                V, u_nominal, relaxation_penalty_param])
 
     def forward(self, x):
@@ -155,19 +179,34 @@ class CLF_QP_Net(nn.Module):
         L_f_V_low = torch.bmm(grad_V, f_func(x, m=low_m, inertia=low_I).unsqueeze(-1))
         L_g_V_low = torch.bmm(grad_V, g_func(x, m=low_m, inertia=low_I))
 
+        L_f_V_high = torch.bmm(grad_V, f_func(x, m=high_m, inertia=high_I).unsqueeze(-1))
+        L_g_V_high = torch.bmm(grad_V, g_func(x, m=high_m, inertia=high_I))
+
+        L_f_V_high_m = torch.bmm(grad_V, f_func(x, m=high_m, inertia=low_I).unsqueeze(-1))
+        L_g_V_high_m = torch.bmm(grad_V, g_func(x, m=high_m, inertia=low_I))
+
+        L_f_V_high_I = torch.bmm(grad_V, f_func(x, m=low_m, inertia=high_I).unsqueeze(-1))
+        L_g_V_high_I = torch.bmm(grad_V, g_func(x, m=low_m, inertia=high_I))
+
         # To find the control input, we need to solve a QP
-        u, r_low = self.qp_layer(
+        u, r_low, r_high, r_high_m, r_high_I = self.qp_layer(
             L_f_V_low.squeeze(-1), L_g_V_low.squeeze(1),
+            L_f_V_high.squeeze(-1), L_g_V_high.squeeze(1),
+            L_f_V_high_m.squeeze(-1), L_g_V_high_m.squeeze(1),
+            L_f_V_high_I.squeeze(-1), L_g_V_high_I.squeeze(1),
             V.unsqueeze(-1),
             u_nominal,
             torch.tensor([self.relaxation_penalty]),
             solver_args={"max_iters": 50000})
 
         Vdot_low = L_f_V_low + torch.bmm(L_g_V_low, u.unsqueeze(-1))
+        Vdot_high = L_f_V_high + torch.bmm(L_g_V_high, u.unsqueeze(-1))
+        Vdot_high_m = L_f_V_high_m + torch.bmm(L_g_V_high_m, u.unsqueeze(-1))
+        Vdot_high_I = L_f_V_high_I + torch.bmm(L_g_V_high_I, u.unsqueeze(-1))
 
         # Average across scenarios
-        Vdot = Vdot_low
-        relaxation = torch.tensor([[0.0]])  # r_low
+        Vdot = Vdot_low + Vdot_high + Vdot_high_m + Vdot_high_I
+        relaxation = r_low + r_high + r_high_m + r_high_I
 
         # if torch.allclose(x, torch.tensor([[0.2000, -0.0279,  0.0107, -0.0078, -0.7441,  0.3272]]), atol=0.001):
         #     f_val = f_func(x, m=low_m, inertia=low_I)

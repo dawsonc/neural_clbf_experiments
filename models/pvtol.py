@@ -14,10 +14,10 @@ g = 9.81  # gravity
 # low_I = 0.1
 # high_I = 0.2
 low_m = 0.486
-high_m = 0.486
+high_m = 0.486 * 1.5
 # moment of inertia lower and upper bounds
 low_I = 0.00383
-high_I = 0.00383
+high_I = 0.00383 * 1.5
 r = 0.25  # lever arm
 n_dims = 6
 n_controls = 2
