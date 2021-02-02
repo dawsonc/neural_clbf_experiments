@@ -24,17 +24,17 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 2000
-xy = torch.Tensor(N_train, 2).uniform_(-6, 6)
-xydot = torch.Tensor(N_train, 2).uniform_(-15, 15)
+N_train = 1000
+xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
+xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 
 # Also get some testing data, just to be principled
-N_test = 1000
-xy = torch.Tensor(N_test, 2).uniform_(-6, 6)
-xydot = torch.Tensor(N_test, 2).uniform_(-15, 15)
+N_test = 500
+xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
+xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
@@ -57,7 +57,7 @@ clf_lambda = 1
 n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
-batch_size = 64
+batch_size = 1  # 64
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -80,7 +80,7 @@ clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalt
                      allow_relax=False)
 
 # Initialize the optimizer
-optimizer = optim.SGD(clf_net.parameters(), lr=learning_rate, momentum=0.1)
+optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
 
 # Train!
 test_losses = []

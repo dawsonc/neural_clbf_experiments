@@ -182,7 +182,5 @@ class CLF_QP_Net(nn.Module):
         for i in range(1, n_scenarios):
             Vdot += L_fs[i].unsqueeze(-1) + torch.bmm(L_gs[i].unsqueeze(1), u.unsqueeze(-1))
             relaxation += rs[i]
-        Vdot /= n_scenarios
-        relaxation /= n_scenarios
 
         return u, relaxation, V, Vdot
