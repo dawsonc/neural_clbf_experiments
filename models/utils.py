@@ -3,7 +3,7 @@ import numpy as np
 import scipy.linalg
 
 
-def lqr(A, B, Q, R):
+def lqr(A, B, Q, R, return_eigs=False):
     """Solve the continuous time lqr controller.
 
     dx/dt = A x + B u
@@ -13,6 +13,8 @@ def lqr(A, B, Q, R):
     Code from Mark Wilfred Mueller at http://www.mwm.im/lqr-controllers-with-python/
 
     Based on Bertsekas, p.151
+
+    Yields the control law u = -K x
     """
 
     # first, try to solve the ricatti equation
@@ -21,4 +23,8 @@ def lqr(A, B, Q, R):
     # compute the LQR gain
     K = np.matrix(scipy.linalg.inv(R)*(B.T*X))
 
-    return K
+    if not return_eigs:
+        return K
+    else:
+        eigVals, _ = scipy.linalg.eig(A-B*K)
+        return K, eigVals

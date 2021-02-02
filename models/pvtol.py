@@ -19,10 +19,10 @@ g = 9.81  # gravity
 # low_I = 0.1
 # high_I = 0.2
 low_m = 0.486
-high_m = 0.486 * 1.5
+high_m = 0.486 * 2
 # moment of inertia lower and upper bounds
 low_I = 0.00383
-high_I = 0.00383 * 1.5
+high_I = 0.00383 * 2
 r = 0.25  # lever arm
 n_dims = 6
 n_controls = 2
@@ -80,7 +80,7 @@ def u_nominal(x, m=low_m, inertia=low_I):
     """
     Return the nominal controller for the system at state x, given by LQR
     """
-    # Linearize the system about the origin
+    # Linearize the system about the x = 0, u1 = u2 = mg / 2
     A = np.zeros((n_dims, n_dims))
     A[0, 3] = 1.0
     A[1, 4] = 1.0
@@ -90,8 +90,8 @@ def u_nominal(x, m=low_m, inertia=low_I):
     B = np.zeros((n_dims, n_controls))
     B[4, 0] = 1.0 / m
     B[4, 1] = 1.0 / m
-    B[5, 0] = r / m
-    B[5, 1] = -r / m
+    B[5, 0] = r / inertia
+    B[5, 1] = -r / inertia
 
     # Define cost matrices as identity
     Q = np.eye(n_dims)
@@ -100,7 +100,8 @@ def u_nominal(x, m=low_m, inertia=low_I):
     # Get feedback matrix
     K = torch.tensor(lqr(A, B, Q, R), dtype=x.dtype)
 
-    # Compute nominal control from feedback
-    u_nominal = (K @ x.T).T
+    # Compute nominal control from feedback + equilibrium control
+    u_nominal = -(K @ x.T).T
+    u_eq = torch.zeros_like(u_nominal) + m*g / 2.0
 
-    return u_nominal
+    return u_nominal #+ u_eq
