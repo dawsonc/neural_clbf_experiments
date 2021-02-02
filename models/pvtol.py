@@ -46,7 +46,7 @@ def f_func(x, m=low_m, inertia=low_I):
     x = [[px, pz, phi, vx, pz, phi_dot]_1, ...]
     """
     # x is batched, so has dimensions [n_batches, 2]. Compute x_dot for each bit
-    f = torch.zeros(x.size())
+    f = torch.zeros_like(x)
 
     f[:, 0] = x[:, 3] * torch.cos(x[:, 2]) - x[:, 4] * torch.sin(x[:, 2])
     f[:, 1] = x[:, 3] * torch.sin(x[:, 2]) + x[:, 4] * torch.cos(x[:, 2])
@@ -63,7 +63,7 @@ def g_func(x, m=low_m, inertia=low_I):
     Return the state-dependent coefficient of the control input for the pvtol system.
     """
     n_batch = x.size()[0]
-    g = torch.zeros(n_batch, n_dims, n_controls)
+    g = torch.zeros(n_batch, n_dims, n_controls, dtype=x.dtype)
 
     # Effect on z acceleration
     g[:, 4, 0] = 1 / m
@@ -81,13 +81,13 @@ def u_nominal(x, m=low_m, inertia=low_I):
     Return the nominal controller for the system at state x, given by LQR
     """
     # Linearize the system about the origin
-    A = np.zeros(n_dims, n_dims)
+    A = np.zeros((n_dims, n_dims))
     A[0, 3] = 1.0
     A[1, 4] = 1.0
     A[2, 5] = 1.0
     A[3, 2] = -g
 
-    B = np.zeros(n_dims, n_controls)
+    B = np.zeros((n_dims, n_controls))
     B[4, 0] = 1.0 / m
     B[4, 1] = 1.0 / m
     B[5, 0] = r / m
@@ -101,6 +101,6 @@ def u_nominal(x, m=low_m, inertia=low_I):
     K = torch.tensor(lqr(A, B, Q, R), dtype=x.dtype)
 
     # Compute nominal control from feedback
-    u_nominal = K @ x.T
+    u_nominal = (K @ x.T).T
 
     return u_nominal
