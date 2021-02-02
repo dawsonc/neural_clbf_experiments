@@ -30,6 +30,13 @@ xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
+# Take some extra samples near the origin to make sure the stabilization is smooth
+xy = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
+xydot = torch.Tensor(N_train, 2).uniform_(-1, 1)
+theta = torch.Tensor(N_train, 1).uniform_(-1, 1)
+theta_dot = torch.Tensor(N_train, 1).uniform_(-1, 1)
+x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
 N_test = 500
@@ -57,7 +64,7 @@ clf_lambda = 1
 n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
-batch_size = 1  # 64
+batch_size = 64
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -116,6 +123,9 @@ for epoch in range(epochs):
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
         loss += lyap_descent_term.mean()
+        #   5.) tuning term to encourage a quadratic-ish shape
+        lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
+        loss += 0.1 * lyap_tuning_term.mean()
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -142,11 +152,15 @@ for epoch in range(epochs):
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
         loss += lyap_descent_term.mean()
+        #   5.) tuning term to encourage a quadratic-ish shape
+        lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
+        loss += 0.1 * lyap_tuning_term.mean()
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
         print(f"                     relaxation: {r.mean().item()}")
         print(f"                         origin: {V0.pow(2).squeeze().item()}")
         print(f"                   descent term: {lyap_descent_term.mean().item()}")
+        print(f"                    tuning term: {0.1 * lyap_tuning_term.mean().item()}")
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() < min(test_losses):

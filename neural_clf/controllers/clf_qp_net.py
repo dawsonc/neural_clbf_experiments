@@ -108,7 +108,7 @@ class CLF_QP_Net(nn.Module):
             constraints.append(self.G_u @ u <= self.h_u)
 
         # The cost is quadratic in the controls and linear in the relaxation
-        objective_expression = 0.5 * cp.sum_squares(u - u_nominal)
+        objective_expression = cp.sum_squares(u - u_nominal)
         for r in relaxations:
             objective_expression += cp.multiply(relaxation_penalty_param, cp.square(r))
         objective = cp.Minimize(objective_expression)

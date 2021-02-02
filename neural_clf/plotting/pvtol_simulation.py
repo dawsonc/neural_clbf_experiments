@@ -45,7 +45,7 @@ scenarios = [
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
-                            checkpoint['clf_lambda'],
+                            0.1,  # checkpoint['clf_lambda'],
                             10.0,  # checkpoint['relaxation_penalty'],
                             f_func,
                             g_func,
@@ -69,7 +69,7 @@ nonrobust_clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 5
+    N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = 2.0
     x_sim_start[:, 1] = 2.0
@@ -82,11 +82,13 @@ with torch.no_grad():
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
 
     t_sim = 5
-    delta_t = 0.005
+    delta_t = 0.01
     num_timesteps = int(t_sim // delta_t)
 
     print("Simulating robust CLF QP controller...")
     x_sim_rclfqp = torch.zeros(num_timesteps, N_sim, n_dims)
+    V_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
+    Vdot_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     x_sim_rclfqp[0, :, :] = x_sim_start
     t_final_rclfqp = 0
     for tstep in tqdm(range(1, num_timesteps)):
@@ -98,7 +100,9 @@ with torch.no_grad():
         except Exception:
             print("Controller failed")
             break
-        # u = u_nominal(x_current, **nominal_scenario)
+
+        V_sim_rclfqp[tstep, :, 0] = V
+        Vdot_sim_rclfqp[tstep, :, 0] = Vdot
         # Get the dynamics
         for i in range(N_sim):
             f_val = f_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
@@ -159,7 +163,9 @@ with torch.no_grad():
     # ax1.plot(t[:t_final_clfqp], x_sim_clfqp[:t_final_clfqp, :, :].norm(dim=-1),
     #          c=sns.color_palette("pastel")[1])
     ax1.plot(t, x_sim_lqr.norm(dim=-1), c=sns.color_palette("pastel")[2])
-    # ax1.plot(t, x_sim_rclfqp[:, :, 1], c=sns.color_palette("pastel")[0])
+
+    ax1.plot(t, V_sim_rclfqp[:, :, 0], c=sns.color_palette("pastel")[1])
+    # ax1.plot(t, Vdot_sim_rclfqp[:, :, 0], c=sns.color_palette("pastel")[1])
     ax1.set_xlabel("$t$")
     ax1.set_ylabel("$||q||$")
     ax1.legend()

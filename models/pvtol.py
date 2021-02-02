@@ -13,10 +13,10 @@ from models.utils import lqr
 # Define parameters of the inverted pendulum
 g = 9.81  # gravity
 # copter mass lower and upper bounds
-low_m = 0.486
+low_m = 1.0
 high_m = low_m * 1.5
 # moment of inertia lower and upper bounds
-low_I = 0.00383
+low_I = 0.01
 high_I = low_I * 1.5
 r = 0.25  # lever arm
 n_dims = 6
@@ -98,9 +98,6 @@ def u_nominal(x, m=low_m, inertia=low_I):
 
     # Get feedback matrix
     K = torch.tensor(lqr(A, B, Q, R), dtype=x.dtype)
-    # print(K)
-    K = -torch.tensor([[10.0, -5.77350269, -13.90968899, 6.19339838, -2.47775213, -0.78165452],
-                       [-10.0, -5.77350269, 13.90968899, -6.19339838, -2.47775213, 0.78165452]])
 
     # Compute nominal control from feedback + equilibrium control
     u_nominal = -(K @ x.T).T
