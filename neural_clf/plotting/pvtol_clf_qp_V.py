@@ -22,7 +22,7 @@ from models.pvtol import (
 sns.set_theme(context="talk", style="white")
 
 # Load the model from file
-filename = "logs/pvtol_model_best.pth.tar"
+filename = "logs/pvtol_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 scenarios = [
     {"m": low_m, "inertia": low_I},
