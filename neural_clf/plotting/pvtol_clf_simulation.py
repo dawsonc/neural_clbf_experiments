@@ -164,8 +164,6 @@ with torch.no_grad():
     #          c=sns.color_palette("pastel")[1])
     ax1.plot(t, x_sim_lqr.norm(dim=-1), c=sns.color_palette("pastel")[2])
 
-    ax1.plot(t, V_sim_rclfqp[:, :, 0], c=sns.color_palette("pastel")[1])
-    # ax1.plot(t, Vdot_sim_rclfqp[:, :, 0], c=sns.color_palette("pastel")[1])
     ax1.set_xlabel("$t$")
     ax1.set_ylabel("$||q||$")
     ax1.legend()

@@ -60,9 +60,9 @@ with torch.no_grad():
             q[0, 0] = x[i]
             q[0, 1] = y[j]
             _, r, V, V_dot = clf_net(q)
-            residuals[i, j] = r
-            V_values[i, j] = V
-            V_dot_values[i, j] = V_dot
+            residuals[j, i] = r
+            V_values[j, i] = V
+            V_dot_values[j, i] = V_dot
 
     fig, axs = plt.subplots(1, 2)
     fig.set_size_inches(17, 8)
@@ -80,5 +80,5 @@ with torch.no_grad():
     axs[1].set_ylabel('$y$')
     axs[1].set_title('$dV/dt$')
 
-    # plt.savefig("logs/plots/pvtol/lyap_contour.png")
+    plt.savefig("logs/plots/pvtol/lyap_contour.png")
     plt.show()
