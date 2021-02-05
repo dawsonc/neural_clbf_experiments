@@ -41,12 +41,14 @@ scenarios = [
     {"m": high_m, "inertia": low_I},
     {"m": high_m, "inertia": high_I},
 ]
+scenarios = [scenarios[-1]]
 robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                                     checkpoint['n_hidden'],
                                     n_controls,
-                                    checkpoint['clf_lambda'],
-                                    checkpoint['cbf_lambda'],
-                                    checkpoint['relaxation_penalty'],
+                                    0.0,  # checkpoint['clf_lambda'],
+                                    5.0,  # checkpoint['cbf_lambda'],
+                                    checkpoint['clf_relaxation_penalty'],
+                                    checkpoint['cbf_relaxation_penalty'],
                                     f_func,
                                     g_func,
                                     u_nominal,
@@ -54,35 +56,35 @@ robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                                     nominal_scenario,
                                     allow_cbf_relax=False)
 robust_clf_cbf_net.load_state_dict(checkpoint['clf_cbf_net'])
-nonrobust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
-                                       checkpoint['n_hidden'],
-                                       n_controls,
-                                       checkpoint['clf_lambda'],
-                                       checkpoint['cbf_lambda'],
-                                       10.0,  # checkpoint['relaxation_penalty'],
-                                       f_func,
-                                       g_func,
-                                       u_nominal,
-                                       [nominal_scenario],
-                                       nominal_scenario)
-nonrobust_clf_cbf_net.load_state_dict(checkpoint['clf_cbf_net'])
+# nonrobust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
+#                                        checkpoint['n_hidden'],
+#                                        n_controls,
+#                                        checkpoint['clf_lambda'],
+#                                        checkpoint['cbf_lambda'],
+#                                        10.0,  # checkpoint['relaxation_penalty'],
+#                                        f_func,
+#                                        g_func,
+#                                        u_nominal,
+#                                        [nominal_scenario],
+#                                        nominal_scenario)
+# nonrobust_clf_cbf_net.load_state_dict(checkpoint['clf_cbf_net'])
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 5
+    N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = 0.0
     x_sim_start[:, 1] = 0.0
     x_sim_start[:, 3] = 0.0
-    x_sim_start[:, 4] = -1.0
+    x_sim_start[:, 4] = -0.2
     x_sim_start[:, 5] = 0.0
 
     # Get a random distribution of masses and inertias
-    ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
-    inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
+    ms = torch.Tensor(N_sim, 1).uniform_(high_m, high_m)
+    inertias = torch.Tensor(N_sim, 1).uniform_(high_I, high_I)
 
     t_sim = 2
-    delta_t = 0.01
+    delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
     print("Simulating robust CLF QP controller...")
@@ -159,7 +161,7 @@ with torch.no_grad():
             xdot = f_val + g_val @ u[i, :]
             x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
-    fig, axs = plt.subplots(2, 1)
+    fig, axs = plt.subplots(3, 1)
     t = np.linspace(0, t_sim, num_timesteps)
     ax1 = axs[0]
     ax1.plot([], c=sns.color_palette("pastel")[0], label="Robust CLF QP")
@@ -170,6 +172,7 @@ with torch.no_grad():
     # ax1.plot(t[:t_final_clfqp], x_sim_clfqp[:t_final_clfqp, :, :].norm(dim=-1),
     #          c=sns.color_palette("pastel")[1])
     ax1.plot(t, x_sim_lqr[:, :, 1], c=sns.color_palette("pastel")[2])
+    ax1.plot(t, t * 0.0 - 1, c="k")
 
     ax1.set_xlabel("$t$")
     ax1.set_ylabel("$z$")
@@ -186,6 +189,18 @@ with torch.no_grad():
     ax2.plot(t[:t_final_rclfqp], H_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
     ax2.plot(t[:t_final_rclfqp], t[:t_final_rclfqp] * 0.0,
+             c="k")
+
+    ax3 = axs[2]
+    ax3.plot([], c=sns.color_palette("pastel")[0], label="V")
+    ax3.plot([], c=sns.color_palette("pastel")[1], label="H")
+    # ax3.plot(t[:t_final_rclfqp], V_sim_rclfqp[:t_final_rclfqp, :, 0],
+    #          c=sns.color_palette("pastel")[0])
+    # ax3.plot(t[:t_final_rclfqp], r_sim_rclfqp[:t_final_rclfqp, :, 0],
+    #          c=sns.color_palette("pastel")[0])
+    ax3.plot(t[:t_final_rclfqp], Hdot_sim_rclfqp[:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[1])
+    ax3.plot(t[:t_final_rclfqp], t[:t_final_rclfqp] * 0.0,
              c="k")
 
     fig.tight_layout()

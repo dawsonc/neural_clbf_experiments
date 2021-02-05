@@ -10,7 +10,8 @@ class CLF_CBF_QP_Net(nn.Module):
     is computed by solving a QP.
     """
 
-    def __init__(self, n_input, n_hidden, n_controls, clf_lambda, cbf_lambda, relaxation_penalty,
+    def __init__(self, n_input, n_hidden, n_controls, clf_lambda, cbf_lambda,
+                 clf_relaxation_penalty, cbf_relaxation_penalty,
                  f_func, g_func, u_nominal, scenarios, nominal_scenario,
                  G_u=torch.tensor([]), h_u=torch.tensor([]),
                  allow_cbf_relax=True):
@@ -23,7 +24,8 @@ class CLF_CBF_QP_Net(nn.Module):
             n_controls: number of control outputs to use
             clf_lambda: desired exponential convergence rate for the CLF
             cbf_lambda: desired exponential convergence rate for the CBF
-            relaxation_penalty: the penalty for relaxing the control lyapunov constraint
+            clf_relaxation_penalty: the penalty for relaxing the control lyapunov constraint
+            cbf_relaxation_penalty: the penalty for relaxing the control barrier constraint
             f_func: a function n_batch x n_dims -> n_batch x n_dims that returns the state-dependent
                     part of the control-affine dynamics
             g_func: a function n_batch x n_dims -> n_batch x n_dims x n_controls that returns the
@@ -62,7 +64,8 @@ class CLF_CBF_QP_Net(nn.Module):
         self.n_controls = n_controls
         self.clf_lambda = clf_lambda
         self.cbf_lambda = cbf_lambda
-        self.relaxation_penalty = relaxation_penalty
+        self.clf_relaxation_penalty = clf_relaxation_penalty
+        self.cbf_relaxation_penalty = cbf_relaxation_penalty
         assert G_u.size(0) == h_u.size(0), "G_u and h_u must have consistent dimensions"
         self.G_u = G_u.double()
         self.h_u = h_u.double()
@@ -71,9 +74,11 @@ class CLF_CBF_QP_Net(nn.Module):
         # The decision variables are the control input and relaxation of the CLF condition for each
         # scenario
         u = cp.Variable(self.n_controls)
-        relaxations = []
+        clf_relaxations = []
+        cbf_relaxations = []
         for scenario in self.scenarios:
-            relaxations.append(cp.Variable(1))
+            clf_relaxations.append(cp.Variable(1))
+            cbf_relaxations.append(cp.Variable(1))
         # And it's parameterized by the lie derivatives and value of the Lyapunov function in each
         # scenario
         L_f_Vs = []
@@ -96,7 +101,8 @@ class CLF_CBF_QP_Net(nn.Module):
 
         # To allow for gradual increasing of the cost of relaxations, set the relaxation penalty
         # as a parameter as well
-        relaxation_penalty_param = cp.Parameter(1, nonneg=True)
+        clf_relaxation_penalty_param = cp.Parameter(1, nonneg=True)
+        cbf_relaxation_penalty_param = cp.Parameter(1, nonneg=True)
         # Also allow passing in a nominal controller to filter
         u_nominal = cp.Parameter(self.n_controls)
 
@@ -118,28 +124,35 @@ class CLF_CBF_QP_Net(nn.Module):
         for i in range(len(self.scenarios)):
             if allow_cbf_relax:
                 constraints.append(
-                    L_f_Hs[i] + L_g_Hs[i] @ u + self.cbf_lambda * H + relaxations[i] >= 0)
+                    L_f_Hs[i] + L_g_Hs[i] @ u + self.cbf_lambda * H + cbf_relaxations[i] >= 0)
             else:
                 constraints.append(
                     L_f_Hs[i] + L_g_Hs[i] @ u + self.cbf_lambda * H >= 0)
             constraints.append(
-                L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V - relaxations[i] <= 0)
-            constraints.append(relaxations[i] >= 0)
+                L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V - clf_relaxations[i] <= 0)
+            constraints.append(clf_relaxations[i] >= 0)
+            constraints.append(cbf_relaxations[i] >= 0)
         # We also add the user-supplied constraints, if provided
         if len(self.G_u) > 0:
             constraints.append(self.G_u @ u <= self.h_u)
 
         # The cost is quadratic in the controls and linear in the relaxation
+        # objective_expression = cp.sum_squares(u - u_nominal)
         objective_expression = cp.sum_squares(u - u_nominal)
-        for r in relaxations:
-            objective_expression += cp.multiply(relaxation_penalty_param, cp.square(r))
+        for r in clf_relaxations:
+            objective_expression += cp.multiply(clf_relaxation_penalty_param, r)
+        for r in cbf_relaxations:
+            objective_expression += cp.multiply(cbf_relaxation_penalty_param, r)
         objective = cp.Minimize(objective_expression)
 
         # Finally, create the optimization problem and the layer based on that
         problem = cp.Problem(objective, constraints)
         assert problem.is_dpp()
-        variables = [u] + relaxations
-        parameters = L_f_Vs + L_g_Vs + L_f_Hs + L_g_Hs + [V, H, u_nominal, relaxation_penalty_param]
+        variables = [u] + clf_relaxations + cbf_relaxations
+        parameters = L_f_Vs + L_g_Vs + L_f_Hs + L_g_Hs + [V, H,
+                                                          u_nominal,
+                                                          clf_relaxation_penalty_param,
+                                                          cbf_relaxation_penalty_param]
         self.qp_layer = CvxpyLayer(problem, variables=variables, parameters=parameters)
 
     def forward(self, x):
@@ -215,8 +228,9 @@ class CLF_CBF_QP_Net(nn.Module):
             V.unsqueeze(-1),
             H,
             u_nominal,
-            torch.tensor([self.relaxation_penalty]),
-            solver_args={"max_iters": 5000})
+            torch.tensor([self.clf_relaxation_penalty]),
+            torch.tensor([self.cbf_relaxation_penalty]),
+            solver_args={"max_iters": 5000000})
         u = result[0]
         rs = result[1:]
         # u = u_nominal

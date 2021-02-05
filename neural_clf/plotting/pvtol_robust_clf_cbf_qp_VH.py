@@ -36,7 +36,8 @@ clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                              n_controls,
                              checkpoint['clf_lambda'],
                              checkpoint['cbf_lambda'],
-                             checkpoint['relaxation_penalty'],
+                             checkpoint['clf_relaxation_penalty'],
+                             checkpoint['cbf_relaxation_penalty'],
                              f_func,
                              g_func,
                              u_nominal,
@@ -83,7 +84,7 @@ with torch.no_grad():
     axs[0, 1].set_ylabel('$z$')
     axs[0, 1].set_title('$dV/dt$')
 
-    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=[-1, 0, 1])
+    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=[-1, -0.01, 0.0, 0.01, 1])
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["safe_z"], checkpoint["safe_z"]],
                    color="g", label="Safe")
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]],
