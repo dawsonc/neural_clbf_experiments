@@ -12,7 +12,8 @@ class CLF_CBF_QP_Net(nn.Module):
 
     def __init__(self, n_input, n_hidden, n_controls, clf_lambda, cbf_lambda, relaxation_penalty,
                  f_func, g_func, u_nominal, scenarios, nominal_scenario,
-                 G_u=torch.tensor([]), h_u=torch.tensor([])):
+                 G_u=torch.tensor([]), h_u=torch.tensor([]),
+                 allow_cbf_relax=True):
         """
         Initialize the network
 
@@ -34,6 +35,7 @@ class CLF_CBF_QP_Net(nn.Module):
             G_u: a matrix of constraints on fesaible control inputs (n_constraints x n_controls)
             h_u: a vector of constraints on fesaible control inputs (n_constraints x 1)
                 Given G_u and h_u, the CLF QP will additionally enforce G_u u <= h_u
+            allow_cbf_relax: set to True to allow the QP to relax the CBF constraint.
         """
         super(CLF_CBF_QP_Net, self).__init__()
 
@@ -114,8 +116,12 @@ class CLF_CBF_QP_Net(nn.Module):
         # constraints for different parameters
         constraints = []
         for i in range(len(self.scenarios)):
-            constraints.append(
-                L_f_Hs[i] + L_g_Hs[i] @ u + self.cbf_lambda * H >= 0)
+            if allow_cbf_relax:
+                constraints.append(
+                    L_f_Hs[i] + L_g_Hs[i] @ u + self.cbf_lambda * H + relaxations[i] >= 0)
+            else:
+                constraints.append(
+                    L_f_Hs[i] + L_g_Hs[i] @ u + self.cbf_lambda * H >= 0)
             constraints.append(
                 L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V - relaxations[i] <= 0)
             constraints.append(relaxations[i] >= 0)
@@ -213,6 +219,8 @@ class CLF_CBF_QP_Net(nn.Module):
             solver_args={"max_iters": 5000})
         u = result[0]
         rs = result[1:]
+        # u = u_nominal
+        # rs = [torch.tensor([0.0])]*len(self.scenarios)
 
         # Average across scenarios
         n_scenarios = len(self.scenarios)

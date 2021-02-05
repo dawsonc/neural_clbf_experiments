@@ -24,9 +24,9 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 5000
-xy = torch.Tensor(N_train, 2).uniform_(-10, 10)
-xydot = torch.Tensor(N_train, 2).uniform_(-20, 20)
+N_train = 1000
+xy = torch.Tensor(N_train, 2).uniform_(-2, 5)
+xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-3*np.pi, 3*np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
@@ -37,19 +37,41 @@ theta = torch.Tensor(N_train, 1).uniform_(-1, 1)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-1, 1)
 x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
+# Take some extra samples from the unsafe set as well
+xy = torch.Tensor(N_train, 2).uniform_(-2, -0.5)
+xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
+theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(N_train, 1).uniform_(-3*np.pi, 3*np.pi)
+x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_train = torch.cat((x_train, x_near_origin), 0)
+N_train = x_train.shape[0]
 
 # Also get some testing data, just to be principled
-N_test = 1000
-xy = torch.Tensor(N_test, 2).uniform_(-10, 10)
-xydot = torch.Tensor(N_test, 2).uniform_(-20, 20)
+N_test = 500
+xy = torch.Tensor(N_test, 2).uniform_(-2, 5)
+xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-3*np.pi, 3*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
+# Take some extra samples near the origin to make sure the stabilization is smooth
+xy = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
+xydot = torch.Tensor(N_test, 2).uniform_(-1, 1)
+theta = torch.Tensor(N_test, 1).uniform_(-1, 1)
+theta_dot = torch.Tensor(N_test, 1).uniform_(-1, 1)
+x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_test = torch.cat((x_test, x_near_origin), 0)
+# Take some extra samples from the unsafe set as well
+xy = torch.Tensor(N_test, 2).uniform_(-2, -0.5)
+xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
+theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(N_test, 1).uniform_(-3*np.pi, 3*np.pi)
+x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_test = torch.cat((x_test, x_near_origin), 0)
 
 # Segment the test set into safe and unsafe regions
 # (z >= -0.25 is safe, z <= -0.5 is unsafe)
-safe_z = -0.25
-unsafe_z = -0.5
+safe_z = 1
+unsafe_z = -1
 x_safe_test = x_test[x_test[:, 1] >= safe_z]
 x_unsafe_test = x_test[x_test[:, 1] <= unsafe_z]
 
@@ -67,9 +89,9 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 1.0
-clf_lambda = 1
-cbf_lambda = 1
-n_hidden = 48
+clf_lambda = 0.0
+cbf_lambda = 1.0
+n_hidden = 64
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
@@ -77,16 +99,26 @@ batch_size = 64
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.5 ** (epoch // 3))
+    lr = learning_rate * (0.5 ** (epoch // 5))
     # print(f"Learning rate: {round(max(lr, 1e-5), 6)}")
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
 
+# We start by allowing the QP to relax the CLF/CBF conditions, but we'll gradually increase the
+# cost of doing so.
+def adjust_relaxation_penalty(cbf_net, epoch):
+    penalty = relaxation_penalty * (2 ** (epoch // 5))
+    cbf_net.relaxation_penalty = min(penalty, 1000)
+
+
 # Instantiate the network
+filename = "logs/pvtol_robust_clf_cbf_qp.pth.tar"
+checkpoint = torch.load(filename)
 clf_cbf_net = CLF_CBF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, cbf_lambda,
                              relaxation_penalty,
                              f_func, g_func, u_nominal, scenarios, nominal_scenario)
+clf_cbf_net.load_state_dict(checkpoint['clf_cbf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(clf_cbf_net.parameters(), lr=learning_rate)
@@ -99,6 +131,7 @@ for epoch in range(epochs):
 
     # Cool learning rate
     adjust_learning_rate(optimizer, epoch)
+    adjust_relaxation_penalty(clf_cbf_net, epoch)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
@@ -124,15 +157,15 @@ for epoch in range(epochs):
         # Compute loss based on...
         loss = 0.0
         #   1.) mean and max Lyapunov relaxation
-        loss += r.mean()
+        # loss += r.mean()
         #   3.) squared value of the Lyapunov function at the origin
-        loss += V0.pow(2).squeeze()
+        # loss += V0.pow(2).squeeze()
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        loss += lyap_descent_term.mean()
+        # loss += lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape for V
         lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-        loss += 0.1 * lyap_tuning_term.mean()
+        # loss += 0.1 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         eps = 0.01
         if x_safe.nelement() > 0:
@@ -144,7 +177,7 @@ for epoch in range(epochs):
             loss += 10 * unsafe_region_barrier_term.mean()
         #   8.) term to encourage satisfaction of CBF condition
         barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
-        loss += 10 * barrier_dynamics_term.mean()
+        loss += barrier_dynamics_term.mean()
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -167,15 +200,15 @@ for epoch in range(epochs):
         # Compute loss based on...
         loss = 0.0
         #   1.) mean and max Lyapunov relaxation
-        loss += r.mean()
+        # loss += r.mean()
         #   3.) squared value of the Lyapunov function at the origin
-        loss += V0.pow(2).squeeze()
+        # loss += V0.pow(2).squeeze()
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        loss += lyap_descent_term.mean()
+        # loss += lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape
         lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
-        loss += 0.1 * lyap_tuning_term.mean()
+        # loss += 0.1 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         safe_region_barrier_term = F.relu(eps - H_safe)
         loss += 10 * safe_region_barrier_term.mean()
@@ -184,7 +217,7 @@ for epoch in range(epochs):
         loss += 10 * unsafe_region_barrier_term.mean()
         #   8.) term to encourage satisfaction of CBF condition
         barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
-        loss += 10 * barrier_dynamics_term.mean()
+        loss += barrier_dynamics_term.mean()
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
         print(f"                     relaxation: {r.mean().item()}")
@@ -196,7 +229,7 @@ for epoch in range(epochs):
         print(f"          barrier dynamics term: {barrier_dynamics_term.mean().item()}")
 
         # Save the model if it's the best yet
-        if not test_losses or loss.item() < min(test_losses):
+        if not test_losses or loss.item() <= min(test_losses):
             print("saving new model")
             filename = 'logs/pvtol_robust_clf_cbf_qp.pth.tar'
             torch.save({'n_hidden': n_hidden,
