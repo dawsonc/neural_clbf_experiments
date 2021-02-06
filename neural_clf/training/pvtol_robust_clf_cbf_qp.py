@@ -24,7 +24,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 1000000
 xy = torch.Tensor(N_train, 2).uniform_(-3, 3)
 xydot = torch.Tensor(N_train, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -39,7 +39,7 @@ x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 10000
+N_test = 50000
 xy = torch.Tensor(N_test, 2).uniform_(-3, 3)
 xydot = torch.Tensor(N_test, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
@@ -153,15 +153,15 @@ for epoch in range(epochs):
         # Compute loss based on...
         loss = 0.0
         #   1.) mean and max Lyapunov relaxation
-        # loss += r.mean()
+        loss += 0.1 * r.mean()
         #   3.) squared value of the Lyapunov function at the origin
-        # loss += V0.pow(2).squeeze()
+        loss += 0.1 * V0.pow(2).squeeze()
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        # loss += lyap_descent_term.mean()
+        loss += 0.1 * lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape for V
         lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-        # loss += 0.1 * lyap_tuning_term.mean()
+        loss += 0.01 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         eps = 0.01
         if x_safe.nelement() > 0:
@@ -196,15 +196,15 @@ for epoch in range(epochs):
         # Compute loss based on...
         loss = 0.0
         #   1.) mean and max Lyapunov relaxation
-        # loss += r.mean()
+        loss += 0.1 * r.mean()
         #   3.) squared value of the Lyapunov function at the origin
-        # loss += V0.pow(2).squeeze()
+        loss += 0.1 * V0.pow(2).squeeze()
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        # loss += lyap_descent_term.mean()
+        loss += 0.1 * lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape
         lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
-        # loss += 0.1 * lyap_tuning_term.mean()
+        loss += 0.01 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         safe_region_barrier_term = F.relu(eps - H_safe)
         loss += safe_region_barrier_term.mean()
