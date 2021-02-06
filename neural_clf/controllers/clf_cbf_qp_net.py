@@ -56,10 +56,11 @@ class CLF_CBF_QP_Net(nn.Module):
         self.Vfc_layer_1 = nn.Linear(n_input, n_hidden)
         self.Vfc_layer_2 = nn.Linear(n_hidden, n_hidden)
 
-        # The CBF network has a much simpler architecture, with three fully connected layers
+        # The CBF network has a much simpler architecture, with only fully connected layers
         self.Hfc_layer_1 = nn.Linear(n_input, n_hidden)
         self.Hfc_layer_2 = nn.Linear(n_hidden, n_hidden)
-        self.Hfc_layer_3 = nn.Linear(n_hidden, 1)
+        self.Hfc_layer_3 = nn.Linear(n_hidden, n_hidden)
+        self.Hfc_layer_4 = nn.Linear(n_hidden, 1)
 
         self.n_controls = n_controls
         self.clf_lambda = clf_lambda
@@ -200,7 +201,8 @@ class CLF_CBF_QP_Net(nn.Module):
         # Next, compute the barrier function
         Hfc1_act = tanh(self.Hfc_layer_1(x))
         Hfc2_act = tanh(self.Hfc_layer_2(Hfc1_act))
-        H = self.Hfc_layer_3(Hfc2_act)
+        Hfc3_act = tanh(self.Hfc_layer_3(Hfc2_act))
+        H = self.Hfc_layer_4(Hfc3_act)
 
         # ...and the Lie derivatives of the barrier function along f and g
 
@@ -208,8 +210,10 @@ class CLF_CBF_QP_Net(nn.Module):
         DHfc1_act = torch.matmul(d_tanh_dx(Hfc1_act), self.Hfc_layer_1.weight)
         # Jacobian of second layer wrt input (n_batch x n_hidden x n_input)
         DHfc2_act = torch.bmm(torch.matmul(d_tanh_dx(Hfc2_act), self.Hfc_layer_2.weight), DHfc1_act)
+        # Jacobian of third layer wrt input (n_batch x n_hidden x n_input)
+        DHfc3_act = torch.bmm(torch.matmul(d_tanh_dx(Hfc3_act), self.Hfc_layer_3.weight), DHfc2_act)
         # Gradient of H wrt input (n_batch x 1 x n_input)
-        grad_H = torch.matmul(self.Hfc_layer_3.weight, DHfc2_act)
+        grad_H = torch.matmul(self.Hfc_layer_4.weight, DHfc3_act)
 
         # Compute lie derivatives for each scenario
         L_f_Hs = []
@@ -245,5 +249,9 @@ class CLF_CBF_QP_Net(nn.Module):
             Vdot += L_f_Vs[i].unsqueeze(-1) + torch.bmm(L_g_Vs[i].unsqueeze(1), u.unsqueeze(-1))
             Hdot += L_f_Hs[i].unsqueeze(-1) + torch.bmm(L_g_Hs[i].unsqueeze(1), u.unsqueeze(-1))
             relaxation += rs[i]
+
+        Vdot /= n_scenarios
+        Hdot /= n_scenarios
+        relaxation /= n_scenarios
 
         return u, relaxation, V, Vdot, H, Hdot

@@ -60,6 +60,7 @@ with torch.no_grad():
         for j in range(n_grid):
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
+            # q = torch.tensor([[0.3479, -0.3234, -0.2267,  1.1374, -0.3032,  0.0992]])
             q[0, 0] = x[i]
             q[0, 1] = z[j]
             _, r, V, V_dot, H, H_dot = clf_cbf_net(q)
@@ -84,11 +85,11 @@ with torch.no_grad():
     axs[0, 1].set_ylabel('$z$')
     axs[0, 1].set_title('$dV/dt$')
 
-    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=[-1, -0.01, 0.0, 0.01, 1])
-    axs[1, 0].plot([x.min(), x.max()], [checkpoint["safe_z"], checkpoint["safe_z"]],
-                   color="g", label="Safe")
-    axs[1, 0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]],
-                   color="r", label="Unsafe")
+    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=20)
+    safe = plt.Circle((0, 0), checkpoint["safe_q_norm"], color='g', fill=False)
+    unsafe = plt.Circle((0, 0), checkpoint["unsafe_q_norm"], color='r', fill=False)
+    axs[1, 0].add_patch(safe)
+    axs[1, 0].add_patch(unsafe)
     plt.colorbar(contours, ax=axs[1, 0], orientation="horizontal")
     axs[1, 0].set_xlabel('$x$')
     axs[1, 0].set_ylabel('$z$')
