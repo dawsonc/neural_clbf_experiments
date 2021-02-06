@@ -45,8 +45,8 @@ scenarios = [scenarios[-1]]
 robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                                     checkpoint['n_hidden'],
                                     n_controls,
-                                    0.0,  # checkpoint['clf_lambda'],
-                                    5.0,  # checkpoint['cbf_lambda'],
+                                    checkpoint['clf_lambda'],
+                                    checkpoint['cbf_lambda'],
                                     checkpoint['clf_relaxation_penalty'],
                                     checkpoint['cbf_relaxation_penalty'],
                                     f_func,
@@ -77,14 +77,14 @@ with torch.no_grad():
     x_sim_start[:, 0] = 0.0
     x_sim_start[:, 1] = 0.0
     x_sim_start[:, 3] = 0.0
-    x_sim_start[:, 4] = -0.1
+    x_sim_start[:, 4] = 0.0
     x_sim_start[:, 5] = 0.0
 
     # Get a random distribution of masses and inertias
-    ms = torch.Tensor(N_sim, 1).uniform_(high_m, high_m)
-    inertias = torch.Tensor(N_sim, 1).uniform_(high_I, high_I)
+    ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
+    inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
-    t_sim = 2
+    t_sim = 5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -94,6 +94,7 @@ with torch.no_grad():
     Vdot_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     H_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     Hdot_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
+    Hdot_est_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     r_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     x_sim_rclfqp[0, :, :] = x_sim_start
     t_final_rclfqp = 0
@@ -111,6 +112,8 @@ with torch.no_grad():
         Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
         H_sim_rclfqp[tstep, :, 0] = H.squeeze()
         Hdot_sim_rclfqp[tstep, :, 0] = Hdot.squeeze()
+        Hdot_est_rclfqp[tstep - 1, :, 0] = H_sim_rclfqp[tstep, :, 0] - H_sim_rclfqp[tstep - 1, :, 0]
+        Hdot_est_rclfqp[tstep - 1, :, 0] /= delta_t
         r_sim_rclfqp[tstep, :, 0] = r.squeeze()
         # Get the dynamics
         for i in range(N_sim):
@@ -122,8 +125,8 @@ with torch.no_grad():
 
         t_final_rclfqp = tstep
 
-        if H <= 0:
-            break
+        # if H <= 0:
+        #     break
 
     # print("Simulating non-robust controller...")
     # x_sim_clfqp = torch.zeros(num_timesteps, N_sim, n_dims)
@@ -165,22 +168,22 @@ with torch.no_grad():
             xdot = f_val + g_val @ u[i, :]
             x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
-    fig, axs = plt.subplots(2, 1)
+    fig, axs = plt.subplots(3, 1)
     t = np.linspace(0, t_sim, num_timesteps)
     ax1 = axs[0]
     ax1.plot([], c=sns.color_palette("pastel")[0], label="Robust CLF QP")
     ax1.plot([], c=sns.color_palette("pastel")[1], label="CLF QP")
     ax1.plot([], c=sns.color_palette("pastel")[2], label="LQR")
-    ax1.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, :].norm(dim=-1),
+    ax1.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, 1],
              c=sns.color_palette("pastel")[0])
-    # ax1.plot(t[:t_final_clfqp], x_sim_clfqp[:t_final_clfqp, :, :].norm(dim=-1),
+    # ax1.plot(t[:t_final_clfqp], x_sim_clfqp[:t_final_clfqp, :, 1],
     #          c=sns.color_palette("pastel")[1])
-    ax1.plot(t, x_sim_lqr[:, :, :].norm(dim=-1), c=sns.color_palette("pastel")[2])
-    ax1.plot(t, t * 0.0 + 1, c="g")
-    ax1.plot(t, t * 0.0 + 2, c="r")
+    ax1.plot(t, x_sim_lqr[:, :, 1], c=sns.color_palette("pastel")[2])
+    ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
+    ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
 
     ax1.set_xlabel("$t$")
-    ax1.set_ylabel("$||q||$")
+    ax1.set_ylabel("$y$")
     ax1.legend()
     ax1.set_xlim([0, t_sim])
 
@@ -191,6 +194,18 @@ with torch.no_grad():
              c=sns.color_palette("pastel")[1])
     ax2.plot(t[:t_final_rclfqp], t[:t_final_rclfqp] * 0.0,
              c="k")
+    ax2.legend()
+
+    ax3 = axs[2]
+    ax3.plot([], c=sns.color_palette("pastel")[0], label="Hdot measured")
+    ax3.plot([], c=sns.color_palette("pastel")[1], label="Hdot predicted")
+    ax3.plot(t[1:t_final_rclfqp], Hdot_sim_rclfqp[1:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[1])
+    ax3.plot(t[1:t_final_rclfqp], Hdot_est_rclfqp[1:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[0])
+    # ax3.plot(t[:t_final_rclfqp], t[:t_final_rclfqp] * 0.0,
+    #          c="k")
+    ax3.legend()
 
     fig.tight_layout()
     plt.show()

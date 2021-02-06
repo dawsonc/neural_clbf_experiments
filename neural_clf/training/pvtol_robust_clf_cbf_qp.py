@@ -24,11 +24,11 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000
-xy = torch.Tensor(N_train, 2).uniform_(-5, 5)
-xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
+N_train = 100000
+xy = torch.Tensor(N_train, 2).uniform_(-3, 3)
+xydot = torch.Tensor(N_train, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-3*np.pi, 3*np.pi)
+theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Take some extra samples near the origin to make sure the stabilization is smooth
 xy = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
@@ -39,11 +39,11 @@ x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 500
-xy = torch.Tensor(N_test, 2).uniform_(-5, 5)
-xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
+N_test = 10000
+xy = torch.Tensor(N_test, 2).uniform_(-3, 3)
+xydot = torch.Tensor(N_test, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(N_test, 1).uniform_(-3*np.pi, 3*np.pi)
+theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Take some extra samples near the origin to make sure the stabilization is smooth
 xy = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
@@ -55,10 +55,10 @@ x_test = torch.cat((x_test, x_near_origin), 0)
 
 # Segment the test set into safe and unsafe regions
 # (z >= -0.25 is safe, z <= -0.5 is unsafe)
-safe_q_norm = 1
-unsafe_q_norm = 2
-safe_mask = x_test.norm(dim=1) <= safe_q_norm
-unsafe_mask = x_test.norm(dim=1) >= safe_q_norm
+safe_z = -0.1
+unsafe_z = -1
+safe_mask = x_test[:, 1] >= safe_z
+unsafe_mask = x_test[:, 1] <= safe_z
 x_safe_test = x_test[safe_mask]
 x_unsafe_test = x_test[unsafe_mask]
 
@@ -79,8 +79,8 @@ n_scenarios = len(scenarios)
 clf_relaxation_penalty = 1.0
 cbf_relaxation_penalty = 10.0
 clf_lambda = 1.0
-cbf_lambda = 10.0
-n_hidden = 256
+cbf_lambda = 0.1
+n_hidden = 32
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
@@ -132,8 +132,8 @@ for epoch in range(epochs):
         x = x_train[indices]
 
         # Segment into safe/unsafe
-        safe_mask = x.norm(dim=1) <= safe_q_norm
-        unsafe_mask = x.norm(dim=1) >= safe_q_norm
+        safe_mask = x[:, 1] >= safe_z
+        unsafe_mask = x[:, 1] <= unsafe_z
         x_safe = x[safe_mask]
         x_unsafe = x[unsafe_mask]
 
@@ -233,7 +233,7 @@ for epoch in range(epochs):
                         'cbf_relaxation_penalty': cbf_relaxation_penalty,
                         'clf_lambda': clf_lambda,
                         'cbf_lambda': cbf_lambda,
-                        'safe_q_norm': safe_q_norm,
-                        'unsafe_q_norm': unsafe_q_norm,
+                        'safe_z': safe_z,
+                        'unsafe_z': unsafe_z,
                         'clf_cbf_net': clf_cbf_net.state_dict()}, filename)
         test_losses.append(loss.item())
