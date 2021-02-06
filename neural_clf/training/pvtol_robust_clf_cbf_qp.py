@@ -191,6 +191,9 @@ for epoch in range(epochs):
         #   8.) term to encourage satisfaction of CBF condition
         barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
         loss += barrier_dynamics_term.mean()
+        #   9.) term to encourage shape of barrier function
+        barrier_tuning_term = (H.squeeze() - (x[:, 1] - (safe_z + unsafe_z) / 2.0))**2
+        loss += barrier_tuning_term.mean()
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -231,6 +234,9 @@ for epoch in range(epochs):
         #   8.) term to encourage satisfaction of CBF condition
         barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
         loss += barrier_dynamics_term.mean()
+        #   9.) term to encourage shape of barrier function
+        barrier_tuning_term = (H.squeeze() - (x_test[:, 1] - (safe_z + unsafe_z) / 2.0))**2
+        loss += barrier_tuning_term.mean()
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
         print(f"                     relaxation: {r.mean().item()}")
@@ -240,6 +246,7 @@ for epoch in range(epochs):
         print(f"               safe region term: {safe_region_barrier_term.mean().item()}")
         print(f"             unsafe region term: {unsafe_region_barrier_term.mean().item()}")
         print(f"          barrier dynamics term: {barrier_dynamics_term.mean().item()}")
+        print(f"            barrier tuning term: {barrier_tuning_term.mean().item()}")
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() <= min(test_losses):
