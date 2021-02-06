@@ -24,34 +24,50 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
-xy = torch.Tensor(N_train, 2).uniform_(-3, 3)
-xydot = torch.Tensor(N_train, 2).uniform_(-3, 3)
+N_train = 10000
+xz = torch.Tensor(N_train, 2).uniform_(-3, 3)
+xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
-x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_train = torch.cat((xz, theta, xzdot, theta_dot), 1)
 # Take some extra samples near the origin to make sure the stabilization is smooth
-xy = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
-xydot = torch.Tensor(N_train, 2).uniform_(-1, 1)
+xz = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
+xzdot = torch.Tensor(N_train, 2).uniform_(-1, 1)
 theta = torch.Tensor(N_train, 1).uniform_(-1, 1)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-1, 1)
-x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
+# Also take some extra samples at the safe/unsafe barrier
+x = torch.Tensor(N_train, 1).uniform_(-3, 3)
+z = torch.Tensor(N_train, 1).uniform_(-1.5, 0.4)
+xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
+theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
+x_near_border = torch.cat((x, z, theta, xzdot, theta_dot), 1)
+x_train = torch.cat((x_train, x_near_border), 0)
 
 # Also get some testing data, just to be principled
-N_test = 50000
-xy = torch.Tensor(N_test, 2).uniform_(-3, 3)
-xydot = torch.Tensor(N_test, 2).uniform_(-3, 3)
+N_test = 1000
+xz = torch.Tensor(N_test, 2).uniform_(-3, 3)
+xzdot = torch.Tensor(N_test, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
-x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_test = torch.cat((xz, theta, xzdot, theta_dot), 1)
 # Take some extra samples near the origin to make sure the stabilization is smooth
-xy = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
-xydot = torch.Tensor(N_test, 2).uniform_(-1, 1)
+xz = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
+xzdot = torch.Tensor(N_test, 2).uniform_(-1, 1)
 theta = torch.Tensor(N_test, 1).uniform_(-1, 1)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-1, 1)
-x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
+x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_origin), 0)
+# Also take some extra samples at the safe/unsafe barrier
+x = torch.Tensor(N_train, 1).uniform_(-3, 3)
+z = torch.Tensor(N_train, 1).uniform_(-1.5, 0.4)
+xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
+theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
+x_near_border = torch.cat((x, z, theta, xzdot, theta_dot), 1)
+x_test = torch.cat((x_test, x_near_border), 0)
 
 # Segment the test set into safe and unsafe regions
 # (z >= -0.25 is safe, z <= -0.5 is unsafe)
@@ -59,6 +75,7 @@ safe_z = -0.1
 unsafe_z = -1
 safe_mask = x_test[:, 1] >= safe_z
 unsafe_mask = x_test[:, 1] <= safe_z
+# Augment the safe set to include only points in the training data
 x_safe_test = x_test[safe_mask]
 x_unsafe_test = x_test[unsafe_mask]
 
@@ -79,7 +96,7 @@ n_scenarios = len(scenarios)
 clf_relaxation_penalty = 1.0
 cbf_relaxation_penalty = 10.0
 clf_lambda = 1.0
-cbf_lambda = 0.1
+cbf_lambda = 1.0
 n_hidden = 32
 learning_rate = 0.001
 epochs = 1000
@@ -161,7 +178,7 @@ for epoch in range(epochs):
         loss += 0.1 * lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape for V
         lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-        loss += 0.01 * lyap_tuning_term.mean()
+        loss += 0.1 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         eps = 0.01
         if x_safe.nelement() > 0:
@@ -204,7 +221,7 @@ for epoch in range(epochs):
         loss += 0.1 * lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape
         lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
-        loss += 0.01 * lyap_tuning_term.mean()
+        loss += 0.1 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         safe_region_barrier_term = F.relu(eps - H_safe)
         loss += safe_region_barrier_term.mean()
