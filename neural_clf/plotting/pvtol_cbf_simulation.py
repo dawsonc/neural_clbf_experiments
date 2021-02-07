@@ -36,9 +36,9 @@ filename = "logs/pvtol_robust_clf_cbf_qp.pth.tar"
 checkpoint = torch.load(filename)
 nominal_scenario = {"m": high_m, "inertia": high_I}
 scenarios = [
-    # {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": high_I},
-    # {"m": high_m, "inertia": low_I},
+    {"m": low_m, "inertia": low_I},
+    {"m": low_m, "inertia": high_I},
+    {"m": high_m, "inertia": low_I},
     {"m": high_m, "inertia": high_I},
 ]
 robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
@@ -46,7 +46,7 @@ robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                                     n_controls,
                                     checkpoint['clf_lambda'],
                                     checkpoint['cbf_lambda'],
-                                    checkpoint['clf_relaxation_penalty'],
+                                    1e2 * checkpoint['clf_relaxation_penalty'],
                                     checkpoint['cbf_relaxation_penalty'],
                                     f_func,
                                     g_func,
@@ -76,7 +76,7 @@ with torch.no_grad():
     x_sim_start[:, 0] = 0.0
     x_sim_start[:, 1] = 0.0
     x_sim_start[:, 3] = 0.0
-    x_sim_start[:, 4] = -2.0
+    x_sim_start[:, 4] = -0.1
     x_sim_start[:, 5] = 0.0
 
     # Get a random distribution of masses and inertias
@@ -158,25 +158,28 @@ with torch.no_grad():
     V_sim_lqr = torch.zeros(num_timesteps, N_sim, 1)
     H_sim_lqr = torch.zeros(num_timesteps, N_sim, 1)
     x_sim_lqr[0, :, :] = x_sim_start
-    for tstep in tqdm(range(1, num_timesteps)):
-        # Get the current state
-        x_current = x_sim_lqr[tstep - 1, :, :]
-        # Get the control input at the current state
-        u = u_nominal(x_current, **nominal_scenario)
-        u_sim_lqr[tstep, :, :] = u.squeeze()
-        # Get the barrier function at the current state
-        _, _, V, _, H, _ = robust_clf_cbf_net(x_current)
-        H_sim_lqr[tstep, :, 0] = H.squeeze()
-        V_sim_lqr[tstep, :, 0] = V.squeeze()
-        # Get the dynamics
-        for i in range(N_sim):
-            f_val = f_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
-            g_val = g_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
-            # Take one step to the future
-            xdot = f_val + g_val @ u[i, :]
-            x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
+    try:
+        for tstep in tqdm(range(1, num_timesteps)):
+            # Get the current state
+            x_current = x_sim_lqr[tstep - 1, :, :]
+            # Get the control input at the current state
+            u = u_nominal(x_current, **nominal_scenario)
+            u_sim_lqr[tstep, :, :] = u.squeeze()
+            # Get the barrier function at the current state
+            _, _, V, _, H, _ = robust_clf_cbf_net(x_current)
+            H_sim_lqr[tstep, :, 0] = H.squeeze()
+            V_sim_lqr[tstep, :, 0] = V.squeeze()
+            # Get the dynamics
+            for i in range(N_sim):
+                f_val = f_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
+                g_val = g_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
+                # Take one step to the future
+                xdot = f_val + g_val @ u[i, :]
+                x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
+    except (Exception, KeyboardInterrupt):
+        print("Controller failed")
 
-    fig, axs = plt.subplots(2, 2)
+    fig, axs = plt.subplots(2, 3)
     t = np.linspace(0, t_sim, num_timesteps)
     ax1 = axs[0, 0]
     ax1.plot([], c=sns.color_palette("pastel")[1], label="Robust CLF QP")
@@ -192,6 +195,20 @@ with torch.no_grad():
     ax1.legend()
     ax1.set_xlim([0, t_sim])
 
+    ax_q = axs[0, 3]
+    ax_q.plot([], c=sns.color_palette("pastel")[1], label="Robust CLF QP")
+    ax_q.plot([], c=sns.color_palette("pastel")[0], label="LQR")
+    ax_q.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, :].norm(dim=-1),
+              c=sns.color_palette("pastel")[1])
+    ax_q.plot(t, x_sim_lqr[:, :, :].norm(dim=-1), c=sns.color_palette("pastel")[0])
+    ax_q.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
+    ax_q.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
+
+    ax_q.set_xlabel("$t$")
+    ax_q.set_ylabel("$||q||$")
+    ax_q.legend()
+    ax_q.set_xlim([0, t_sim])
+
     ax2 = axs[0, 1]
     ax2.plot([], c=sns.color_palette("pastel")[0], label="LQR H")
     ax2.plot([], c=sns.color_palette("pastel")[1], label="CLF H")
@@ -205,8 +222,8 @@ with torch.no_grad():
     ax3 = axs[1, 1]
     ax3.plot([], c=sns.color_palette("pastel")[0], label="LQR V")
     ax3.plot([], c=sns.color_palette("pastel")[1], label="CLF V")
-    ax3.plot(t, V_sim_lqr[:, :, 0],
-             c=sns.color_palette("pastel")[0])
+    # ax3.plot(t, V_sim_lqr[:, :, 0],
+    #          c=sns.color_palette("pastel")[0])
     ax3.plot(t[:t_final_rclfqp], V_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
     ax3.plot(t, t * 0.0, c="k")

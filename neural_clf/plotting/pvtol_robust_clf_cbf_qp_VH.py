@@ -49,8 +49,8 @@ clf_cbf_net.load_state_dict(checkpoint['clf_cbf_net'])
 
 with torch.no_grad():
     n_grid = 40
-    x = torch.linspace(-5, 5, n_grid)
-    z = torch.linspace(-2, 5, n_grid)
+    x = torch.linspace(-3, 3, n_grid)
+    z = torch.linspace(-3, 3, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
     residuals = torch.zeros(n_grid, n_grid)
     V_values = torch.zeros(n_grid, n_grid)
@@ -88,7 +88,7 @@ with torch.no_grad():
     axs[0, 1].set_ylabel('$z$')
     axs[0, 1].set_title('$dV/dt$')
 
-    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=20)
+    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=[-2.0, -0.1, 0.0, 2.0, 10])
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["safe_z"], checkpoint["safe_z"]], c="g")
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]], c="r")
     plt.colorbar(contours, ax=axs[1, 0], orientation="horizontal")
