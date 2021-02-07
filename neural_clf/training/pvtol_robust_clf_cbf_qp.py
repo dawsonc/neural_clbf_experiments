@@ -24,7 +24,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000
+N_train = 10000
 xz = torch.Tensor(N_train, 2).uniform_(-3, 3)
 xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
