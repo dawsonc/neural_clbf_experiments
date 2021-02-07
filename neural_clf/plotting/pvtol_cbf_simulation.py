@@ -46,7 +46,7 @@ robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                                     n_controls,
                                     checkpoint['clf_lambda'],
                                     checkpoint['cbf_lambda'],
-                                    1e2 * checkpoint['clf_relaxation_penalty'],
+                                    checkpoint['clf_relaxation_penalty'],
                                     checkpoint['cbf_relaxation_penalty'],
                                     f_func,
                                     g_func,
@@ -76,7 +76,7 @@ with torch.no_grad():
     x_sim_start[:, 0] = 0.0
     x_sim_start[:, 1] = 0.0
     x_sim_start[:, 3] = 0.0
-    x_sim_start[:, 4] = -0.1
+    x_sim_start[:, 4] = -2.0
     x_sim_start[:, 5] = 0.0
 
     # Get a random distribution of masses and inertias
@@ -179,7 +179,7 @@ with torch.no_grad():
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
-    fig, axs = plt.subplots(2, 3)
+    fig, axs = plt.subplots(2, 2)
     t = np.linspace(0, t_sim, num_timesteps)
     ax1 = axs[0, 0]
     ax1.plot([], c=sns.color_palette("pastel")[1], label="Robust CLF QP")
@@ -194,20 +194,6 @@ with torch.no_grad():
     ax1.set_ylabel("$y$")
     ax1.legend()
     ax1.set_xlim([0, t_sim])
-
-    ax_q = axs[0, 3]
-    ax_q.plot([], c=sns.color_palette("pastel")[1], label="Robust CLF QP")
-    ax_q.plot([], c=sns.color_palette("pastel")[0], label="LQR")
-    ax_q.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, :].norm(dim=-1),
-              c=sns.color_palette("pastel")[1])
-    ax_q.plot(t, x_sim_lqr[:, :, :].norm(dim=-1), c=sns.color_palette("pastel")[0])
-    ax_q.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
-    ax_q.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
-
-    ax_q.set_xlabel("$t$")
-    ax_q.set_ylabel("$||q||$")
-    ax_q.legend()
-    ax_q.set_xlim([0, t_sim])
 
     ax2 = axs[0, 1]
     ax2.plot([], c=sns.color_palette("pastel")[0], label="LQR H")

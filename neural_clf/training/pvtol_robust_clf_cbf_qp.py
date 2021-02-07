@@ -170,15 +170,15 @@ for epoch in range(epochs):
         # Compute loss based on...
         loss = 0.0
         #   1.) mean and max Lyapunov relaxation
-        # loss += 0.1 * r.mean()
+        loss += 0.1 * r.mean()
         #   3.) squared value of the Lyapunov function at the origin
-        # loss += 0.1 * V0.pow(2).squeeze()
+        loss += 0.1 * V0.pow(2).squeeze()
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        # loss += 0.1 * lyap_descent_term.mean()
+        loss += 0.1 * lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape for V
         lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-        # loss += 0.1 * lyap_tuning_term.mean()
+        loss += 0.1 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         eps = 0.01
         if x_safe.nelement() > 0:
@@ -190,10 +190,10 @@ for epoch in range(epochs):
             loss += unsafe_region_barrier_term.mean()
         #   8.) term to encourage satisfaction of CBF condition
         barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
-        # loss += barrier_dynamics_term.mean()
+        loss += barrier_dynamics_term.mean()
         #   9.) term to encourage shape of barrier function
         barrier_tuning_term = (H.squeeze() - (x[:, 1] - (safe_z + unsafe_z) / 2.0))**2
-        # loss += barrier_tuning_term.mean()
+        loss += barrier_tuning_term.mean()
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -216,15 +216,15 @@ for epoch in range(epochs):
         # Compute loss based on...
         loss = 0.0
         #   1.) mean and max Lyapunov relaxation
-        # loss += 0.1 * r.mean()
+        loss += 0.1 * r.mean()
         #   3.) squared value of the Lyapunov function at the origin
-        # loss += 0.1 * V0.pow(2).squeeze()
+        loss += 0.1 * V0.pow(2).squeeze()
         #   4.) term to encourage satisfaction of CLF condition
         lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        # loss += 0.1 * lyap_descent_term.mean()
+        loss += 0.1 * lyap_descent_term.mean()
         #   5.) tuning term to encourage a quadratic-ish shape
         lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
-        # loss += 0.1 * lyap_tuning_term.mean()
+        loss += 0.1 * lyap_tuning_term.mean()
         #   6.) term to encourage barrier H >= 0 in the safe region
         safe_region_barrier_term = F.relu(eps - H_safe)
         loss += safe_region_barrier_term.mean()
@@ -233,10 +233,10 @@ for epoch in range(epochs):
         loss += unsafe_region_barrier_term.mean()
         #   8.) term to encourage satisfaction of CBF condition
         barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
-        # loss += barrier_dynamics_term.mean()
+        loss += barrier_dynamics_term.mean()
         #   9.) term to encourage shape of barrier function
         barrier_tuning_term = (H.squeeze() - (x_test[:, 1] - (safe_z + unsafe_z) / 2.0))**2
-        # loss += 0.1 * barrier_tuning_term.mean()
+        loss += 0.1 * barrier_tuning_term.mean()
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
         print(f"                     relaxation: {0.1 * r.mean().item()}")
