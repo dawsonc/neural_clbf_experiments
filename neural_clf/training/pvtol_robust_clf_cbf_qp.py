@@ -74,7 +74,7 @@ x_test = torch.cat((x_test, x_near_border), 0)
 safe_z = -0.1
 unsafe_z = -1
 safe_mask = x_test[:, 1] >= safe_z
-unsafe_mask = x_test[:, 1] <= safe_z
+unsafe_mask = x_test[:, 1] <= unsafe_z
 # Augment the safe set to include only points in the training data
 x_safe_test = x_test[safe_mask]
 x_unsafe_test = x_test[unsafe_mask]
@@ -236,7 +236,7 @@ for epoch in range(epochs):
         loss += barrier_dynamics_term.mean()
         #   9.) term to encourage shape of barrier function
         barrier_tuning_term = (H.squeeze() - (x_test[:, 1] - (safe_z + unsafe_z) / 2.0))**2
-        loss += barrier_tuning_term.mean()
+        loss += 0.1 * barrier_tuning_term.mean()
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
         print(f"                     relaxation: {r.mean().item()}")
