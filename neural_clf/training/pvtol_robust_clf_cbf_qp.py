@@ -24,7 +24,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 10000
+N_train = 1000
 xz = torch.Tensor(N_train, 2).uniform_(-3, 3)
 xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -38,11 +38,11 @@ theta_dot = torch.Tensor(N_train, 1).uniform_(-1, 1)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 # Also take some extra samples at the safe/unsafe barrier
-x = torch.Tensor(N_train, 1).uniform_(-3, 3)
-z = torch.Tensor(N_train, 1).uniform_(-1.5, 0.4)
-xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
-theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
+x = torch.Tensor(3 * N_train, 1).uniform_(-3, 3)
+z = torch.Tensor(3 * N_train, 1).uniform_(-2.0, 0.5)
+xzdot = torch.Tensor(3 * N_train, 2).uniform_(-3, 3)
+theta = torch.Tensor(3 * N_train, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(3 * N_train, 1).uniform_(-2*np.pi, 2*np.pi)
 x_near_border = torch.cat((x, z, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_border), 0)
 
@@ -61,11 +61,11 @@ theta_dot = torch.Tensor(N_test, 1).uniform_(-1, 1)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_origin), 0)
 # Also take some extra samples at the safe/unsafe barrier
-x = torch.Tensor(N_train, 1).uniform_(-3, 3)
-z = torch.Tensor(N_train, 1).uniform_(-1.5, 0.4)
-xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
-theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
+x = torch.Tensor(3 * N_test, 1).uniform_(-3, 3)
+z = torch.Tensor(3 * N_test, 1).uniform_(-2.0, 0.5)
+xzdot = torch.Tensor(3 * N_test, 2).uniform_(-3, 3)
+theta = torch.Tensor(3 * N_test, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(3 * N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_near_border = torch.cat((x, z, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_border), 0)
 
@@ -105,7 +105,7 @@ batch_size = 64
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.5 ** (epoch // 3))
+    lr = learning_rate * (0.5 ** (epoch // 6))
     # print(f"Learning rate: {round(max(lr, 1e-5), 6)}")
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
