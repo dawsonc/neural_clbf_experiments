@@ -98,7 +98,7 @@ cbf_relaxation_penalty = 10.0
 clf_lambda = 1.0
 cbf_lambda = 1.0
 n_hidden = 32
-learning_rate = 0.001
+learning_rate = 1e-4
 epochs = 1000
 batch_size = 64
 
@@ -239,14 +239,14 @@ for epoch in range(epochs):
         loss += 0.1 * barrier_tuning_term.mean()
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
-        print(f"                     relaxation: {r.mean().item()}")
-        print(f"                         origin: {V0.pow(2).squeeze().item()}")
-        print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
+        print(f"                     relaxation: {0.1 * r.mean().item()}")
+        print(f"                         origin: {0.1 * V0.pow(2).squeeze().item()}")
+        print(f"               CLF descent term: {0.1 * lyap_descent_term.mean().item()}")
         print(f"                CLF tuning term: {0.1 * lyap_tuning_term.mean().item()}")
         print(f"               safe region term: {safe_region_barrier_term.mean().item()}")
         print(f"             unsafe region term: {unsafe_region_barrier_term.mean().item()}")
         print(f"          barrier dynamics term: {barrier_dynamics_term.mean().item()}")
-        print(f"            barrier tuning term: {barrier_tuning_term.mean().item()}")
+        print(f"            barrier tuning term: {0.1 * barrier_tuning_term.mean().item()}")
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() <= min(test_losses):
