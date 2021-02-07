@@ -237,10 +237,6 @@ class CLF_CBF_QP_Net(nn.Module):
             solver_args={"max_iters": 5000000})
         u = result[0]
         rs = result[1:]
-        # u = u_nominal
-        # rs = [torch.tensor([0.0])]*len(self.scenarios)
-        if x[0, 1] < -0.3:
-            import pdb; pdb.set_trace()
 
         # Average across scenarios
         n_scenarios = len(self.scenarios)
