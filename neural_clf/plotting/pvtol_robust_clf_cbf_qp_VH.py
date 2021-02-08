@@ -88,7 +88,7 @@ with torch.no_grad():
     axs[0, 1].set_ylabel('$z$')
     axs[0, 1].set_title('$dV/dt$')
 
-    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=[-2.0, -0.1, 0.0, 2.0, 10])
+    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=20)
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["safe_z"], checkpoint["safe_z"]], c="g")
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]], c="r")
     plt.colorbar(contours, ax=axs[1, 0], orientation="horizontal")

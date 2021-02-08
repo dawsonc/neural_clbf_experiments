@@ -321,9 +321,9 @@ def lyapunov_loss(x, x0, net, clf_lambda, timestep=0.001, print_loss=False):
         lyap_descent_term += F.relu(Vdot.squeeze() + clf_lambda * V)
     loss += lyap_descent_term.mean()
 
-    # #   3.) A tuning term to encourage a quadratic-ish shape for V
-    # lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-    # loss += lyap_tuning_term.mean()
+    #   3.) A tuning term to encourage a quadratic-ish shape for V
+    lyap_tuning_term = 0.1 * F.relu(0.1*(x*x).sum(1) - V)
+    loss += lyap_tuning_term.mean()
 
     #   4.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
@@ -331,7 +331,7 @@ def lyapunov_loss(x, x0, net, clf_lambda, timestep=0.001, print_loss=False):
     if print_loss:
         print(f"                     CLF origin: {V0.pow(2).squeeze().item()}")
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
-        # print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
+        print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
         print(f"            CLF relaxation term: {r.mean().item()}")
 
     return loss
@@ -343,8 +343,8 @@ def barrier_loss(x,
                  net,
                  cbf_lambda,
                  timestep=0.001,
-                 eps_safe=0.001,
-                 eps_unsafe=0.05,
+                 eps_safe=0.01,
+                 eps_unsafe=0.1,
                  eps_dynamics=0.01,
                  print_loss=False):
     """
@@ -373,7 +373,7 @@ def barrier_loss(x,
     #   2.) term to encourage barrier H < 0 in the unsafe region
     H_unsafe, _ = net.compute_barrier(x[unsafe_mask])
     unsafe_region_barrier_term = F.relu(eps_unsafe + H_unsafe)
-    loss += unsafe_region_barrier_term.mean()
+    loss += 5 * unsafe_region_barrier_term.mean()
 
     #   3.) term to encourage satisfaction of CBF condition
     u, _, _, _, H, _ = net(x)
