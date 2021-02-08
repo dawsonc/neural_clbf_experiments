@@ -5,7 +5,12 @@ import torch.optim as optim
 from tqdm import trange
 
 
-from neural_clf.controllers.clf_cbf_qp_net import CLF_CBF_QP_Net, lyapunov_loss, barrier_loss
+from neural_clf.controllers.clf_cbf_qp_net import (
+    CLF_CBF_QP_Net,
+    lyapunov_loss,
+    barrier_loss,
+    controller_loss,
+)
 from models.pvtol import (
     f_func,
     g_func,
@@ -163,6 +168,7 @@ for epoch in range(epochs):
                              cbf_lambda,
                              timestep,
                              print_loss=False)
+        loss += controller_loss(x, clf_cbf_net, print_loss=False)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -187,6 +193,7 @@ for epoch in range(epochs):
                              cbf_lambda,
                              timestep,
                              print_loss=True)
+        loss += controller_loss(x, clf_cbf_net, print_loss=True)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 

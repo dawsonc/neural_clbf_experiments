@@ -67,6 +67,12 @@ class CLF_CBF_QP_Net(nn.Module):
         self.Hfc_layer_3 = nn.Linear(n_hidden, n_hidden)
         self.Hfc_layer_4 = nn.Linear(n_hidden, 1)
 
+        # We also train a controller to learn the nominal control input
+        self.Ufc_layer_1 = nn.Linear(n_input, n_hidden)
+        self.Ufc_layer_2 = nn.Linear(n_hidden, n_hidden)
+        self.Ufc_layer_3 = nn.Linear(n_hidden, n_hidden)
+        self.Ufc_layer_4 = nn.Linear(n_hidden, n_controls)
+
         self.n_controls = n_controls
         self.clf_lambda = clf_lambda
         self.cbf_lambda = cbf_lambda
@@ -190,6 +196,23 @@ class CLF_CBF_QP_Net(nn.Module):
 
         return H, grad_H
 
+    def compute_controls(self, x):
+        """
+        Computes the control input (for use in the QP filter)
+
+        args:
+            x: the state at the current timestep [n_batch, n_dims]
+        returns:
+            u: the value of the barrier at each provided point x [n_batch, n_controls]
+        """
+        tanh = nn.Tanh()
+        Ufc1_act = tanh(self.Ufc_layer_1(x))
+        Ufc2_act = tanh(self.Ufc_layer_2(Ufc1_act))
+        Ufc3_act = tanh(self.Ufc_layer_3(Ufc2_act))
+        U = self.Ufc_layer_4(Ufc3_act)
+
+        return U
+
     def compute_lyapunov(self, x):
         """
         Computes the value and gradient of the Lyapunov function
@@ -241,6 +264,7 @@ class CLF_CBF_QP_Net(nn.Module):
         # Compute the Lyapunov and barrier functions
         V, grad_V = self.compute_lyapunov(x)
         H, grad_H = self.compute_barrier(x)
+        u_nominal = self.compute_controls(x)
 
         # Compute lie derivatives for each scenario
         L_f_Vs = []
@@ -255,9 +279,6 @@ class CLF_CBF_QP_Net(nn.Module):
             # Barrier Lie derivaties
             L_f_Hs.append(torch.bmm(grad_H, self.f(x, **scenario).unsqueeze(-1)).squeeze(-1))
             L_g_Hs.append(torch.bmm(grad_H, self.g(x, **scenario)).squeeze(1))
-
-        # Also get the nominal control input
-        u_nominal = self.u_nominal(x, **self.nominal_scenario)
 
         # To find the control input, we need to solve a QP
         result = self.qp_layer(
@@ -395,4 +416,23 @@ def barrier_loss(x,
         print(f"             unsafe region term: {unsafe_region_barrier_term.mean().item()}")
         print(f"          barrier dynamics term: {barrier_dynamics_term.mean().item()}")
 
+    return loss
+
+
+def controller_loss(x, net, print_loss=False):
+    """
+    Compute a loss to train the filtered controller
+
+    args:
+        x: the points at which to evaluate the loss
+        net: a CLF_CBF_QP_Net instance
+        print_loss: True to enable printing the values of component terms
+    returns:
+        loss: the loss for the given controller function
+    """
+    u_nominal = net.u_nominal(x, **net.nominal_scenario)
+    u_filtered, _, _, _, _, _ = net(x)
+
+    controller_squared_error = ((u_nominal - u_filtered)**2).sum(dim=-1)
+    loss = controller_squared_error.mean()
     return loss
