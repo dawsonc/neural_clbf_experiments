@@ -343,7 +343,9 @@ def barrier_loss(x,
                  net,
                  cbf_lambda,
                  timestep=0.001,
-                 eps=0.01,
+                 eps_safe=0.001,
+                 eps_unsafe=0.05,
+                 eps_dynamics=0.01,
                  print_loss=False):
     """
     Compute a loss to train the barrier function
@@ -365,12 +367,12 @@ def barrier_loss(x,
     loss = 0.0
     #   1.) term to encourage barrier H >= 0 in the safe region
     H_safe, _ = net.compute_barrier(x[safe_mask])
-    safe_region_barrier_term = F.relu(eps - H_safe)
+    safe_region_barrier_term = F.relu(eps_safe - H_safe)
     loss += safe_region_barrier_term.mean()
 
     #   2.) term to encourage barrier H < 0 in the unsafe region
     H_unsafe, _ = net.compute_barrier(x[unsafe_mask])
-    unsafe_region_barrier_term = F.relu(eps + H_unsafe)
+    unsafe_region_barrier_term = F.relu(eps_unsafe + H_unsafe)
     loss += unsafe_region_barrier_term.mean()
 
     #   3.) term to encourage satisfaction of CBF condition
@@ -383,7 +385,7 @@ def barrier_loss(x,
         x_next = x + timestep * xdot
         H_next, _ = net.compute_barrier(x_next)
         Hdot = H_next - H
-        barrier_dynamics_term += F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
+        barrier_dynamics_term += F.relu(eps_dynamics - Hdot.squeeze() - cbf_lambda * H.squeeze())
     loss += barrier_dynamics_term.mean()
 
     if print_loss:
