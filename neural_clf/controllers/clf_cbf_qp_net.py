@@ -372,8 +372,8 @@ def barrier_loss(x,
 
     #   2.) term to encourage barrier H < 0 in the unsafe region
     H_unsafe, _ = net.compute_barrier(x[unsafe_mask])
-    unsafe_region_barrier_term = F.relu(eps_unsafe + H_unsafe)
-    loss += 5 * unsafe_region_barrier_term.mean()
+    unsafe_region_barrier_term = 10 * F.relu(eps_unsafe + H_unsafe)
+    loss += unsafe_region_barrier_term.mean()
 
     #   3.) term to encourage satisfaction of CBF condition
     u, _, _, _, H, _ = net(x)
