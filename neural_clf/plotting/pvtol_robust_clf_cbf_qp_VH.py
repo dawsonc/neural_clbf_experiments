@@ -48,7 +48,7 @@ clf_cbf_net = CLF_CBF_QP_Net(n_dims,
 clf_cbf_net.load_state_dict(checkpoint['clf_cbf_net'])
 
 with torch.no_grad():
-    n_grid = 40
+    n_grid = 20
     x = torch.linspace(-3, 3, n_grid)
     z = torch.linspace(-3, 3, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
@@ -63,7 +63,6 @@ with torch.no_grad():
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
             # q = torch.tensor([[ 0.0577, -1.0022, -0.6185,  0.3205, -3.8008, -2.0763]])
-            q[0, 4] = -2.0
             q[0, 4] += x[i]
             q[0, 1] = z[j]
             _, r, V, V_dot, H, H_dot = clf_cbf_net(q)
@@ -88,7 +87,7 @@ with torch.no_grad():
     axs[0, 1].set_ylabel('$z$')
     axs[0, 1].set_title('$dV/dt$')
 
-    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=20)
+    contours = axs[1, 0].contourf(x, z, H_values, cmap="magma", levels=[-2.0, -0.1, 0.0, 2.0, 10])
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["safe_z"], checkpoint["safe_z"]], c="g")
     axs[1, 0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]], c="r")
     plt.colorbar(contours, ax=axs[1, 0], orientation="horizontal")

@@ -235,6 +235,8 @@ class CLF_CBF_QP_Net(nn.Module):
             r: the relaxation required to satisfy the CLF inequality
             V: the value of the Lyapunov function at a given point
             Vdot: the time derivative of the Lyapunov function
+            H: the value of the barrier function at a given point
+            Hdot: the time derivative of the barrier function
         """
         # Compute the Lyapunov and barrier functions
         V, grad_V = self.compute_lyapunov(x)
