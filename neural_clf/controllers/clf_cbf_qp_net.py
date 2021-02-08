@@ -435,4 +435,8 @@ def controller_loss(x, net, print_loss=False):
 
     controller_squared_error = ((u_nominal - u_filtered)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
+
+    if print_loss:
+        print(f"                controller term: {controller_squared_error.mean().item()}")
+
     return loss
