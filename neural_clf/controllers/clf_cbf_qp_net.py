@@ -1,7 +1,12 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import cvxpy as cp
 from cvxpylayers.torch import CvxpyLayer
+
+
+def d_tanh_dx(tanh):
+    return torch.diag_embed(1 - tanh**2)
 
 
 class CLF_CBF_QP_Net(nn.Module):
@@ -156,49 +161,17 @@ class CLF_CBF_QP_Net(nn.Module):
                                                           cbf_relaxation_penalty_param]
         self.qp_layer = CvxpyLayer(problem, variables=variables, parameters=parameters)
 
-    def forward(self, x):
+    def compute_barrier(self, x):
         """
-        Compute the forward pass of the controller
+        Computes the value and gradient of the barrier function
 
         args:
-            x: the state at the current timestep [n_batch, 2]
+            x: the state at the current timestep [n_batch, n_dims]
         returns:
-            u: the input at the current state [n_batch, 1]
-            r: the relaxation required to satisfy the CLF inequality
-            V: the value of the Lyapunov function at a given point
-            Vdot: the time derivative of the Lyapunov function
+            H: the value of the barrier at each provided point x [n_batch, 1]
+            grad_H: the gradient of H [n_batch, n_dims]
         """
-        # Use the first two layers to compute the Lyapunov function
         tanh = nn.Tanh()
-        Vfc1_act = tanh(self.Vfc_layer_1(x))
-        Vfc2_act = tanh(self.Vfc_layer_2(Vfc1_act))
-        V = 0.5 * (Vfc2_act * Vfc2_act).sum(1)
-
-        # We also need to calculate the Lie derivative of V along f and g
-        #
-        # L_f V = \grad V * f
-        # L_g V = \grad V * g
-        #
-        # Since V = tanh(w2 * tanh(w1*x + b1) + b1),
-        # grad V = d_tanh_dx(V) * w2 * d_tanh_dx(tanh(w1*x + b1)) * w1
-        def d_tanh_dx(tanh):
-            return torch.diag_embed(1 - tanh**2)
-
-        # Jacobian of first layer wrt input (n_batch x n_hidden x n_input)
-        DVfc1_act = torch.matmul(d_tanh_dx(Vfc1_act), self.Vfc_layer_1.weight)
-        # Jacobian of second layer wrt input (n_batch x n_hidden x n_input)
-        DVfc2_act = torch.bmm(torch.matmul(d_tanh_dx(Vfc2_act), self.Vfc_layer_2.weight), DVfc1_act)
-        # Gradient of V wrt input (n_batch x 1 x n_input)
-        grad_V = torch.bmm(Vfc2_act.unsqueeze(1), DVfc2_act)
-
-        # Compute lie derivatives for each scenario
-        L_f_Vs = []
-        L_g_Vs = []
-        for scenario in self.scenarios:
-            L_f_Vs.append(torch.bmm(grad_V, self.f(x, **scenario).unsqueeze(-1)).squeeze(-1))
-            L_g_Vs.append(torch.bmm(grad_V, self.g(x, **scenario)).squeeze(1))
-
-        # Next, compute the barrier function
         Hfc1_act = tanh(self.Hfc_layer_1(x))
         Hfc2_act = tanh(self.Hfc_layer_2(Hfc1_act))
         Hfc3_act = tanh(self.Hfc_layer_3(Hfc2_act))
@@ -215,10 +188,69 @@ class CLF_CBF_QP_Net(nn.Module):
         # Gradient of H wrt input (n_batch x 1 x n_input)
         grad_H = torch.matmul(self.Hfc_layer_4.weight, DHfc3_act)
 
+        return H, grad_H
+
+    def compute_lyapunov(self, x):
+        """
+        Computes the value and gradient of the Lyapunov function
+
+        args:
+            x: the state at the current timestep [n_batch, n_dims]
+        returns:
+            V: the value of the Lyapunov at each provided point x [n_batch, 1]
+            grad_V: the gradient of V [n_batch, n_dims]
+        """
+        # Use the first two layers to compute the Lyapunov function
+        tanh = nn.Tanh()
+        Vfc1_act = tanh(self.Vfc_layer_1(x))
+        Vfc2_act = tanh(self.Vfc_layer_2(Vfc1_act))
+        # Compute the Lyapunov function as the square norm of the last layer activations
+        V = 0.5 * (Vfc2_act * Vfc2_act).sum(1)
+
+        # We also need to calculate the Lie derivative of V along f and g
+        #
+        # L_f V = \grad V * f
+        # L_g V = \grad V * g
+        #
+        # Since V = tanh(w2 * tanh(w1*x + b1) + b1),
+        # grad V = d_tanh_dx(V) * w2 * d_tanh_dx(tanh(w1*x + b1)) * w1
+
+        # Jacobian of first layer wrt input (n_batch x n_hidden x n_input)
+        DVfc1_act = torch.matmul(d_tanh_dx(Vfc1_act), self.Vfc_layer_1.weight)
+        # Jacobian of second layer wrt input (n_batch x n_hidden x n_input)
+        DVfc2_act = torch.bmm(torch.matmul(d_tanh_dx(Vfc2_act), self.Vfc_layer_2.weight), DVfc1_act)
+        # Gradient of V wrt input (n_batch x 1 x n_input)
+        grad_V = torch.bmm(Vfc2_act.unsqueeze(1), DVfc2_act)
+
+        return V, grad_V
+
+    def forward(self, x):
+        """
+        Compute the forward pass of the controller
+
+        args:
+            x: the state at the current timestep [n_batch, n_dims]
+        returns:
+            u: the input at the current state [n_batch, n_controls]
+            r: the relaxation required to satisfy the CLF inequality
+            V: the value of the Lyapunov function at a given point
+            Vdot: the time derivative of the Lyapunov function
+        """
+        # Compute the Lyapunov and barrier functions
+        V, grad_V = self.compute_lyapunov(x)
+        H, grad_H = self.compute_barrier(x)
+
         # Compute lie derivatives for each scenario
+        L_f_Vs = []
+        L_g_Vs = []
         L_f_Hs = []
         L_g_Hs = []
         for scenario in self.scenarios:
+            # Lyapunov Lie derivatives
+            L_f_Vs.append(torch.bmm(grad_V, self.f(x, **scenario).unsqueeze(-1)).squeeze(-1))
+            L_g_Vs.append(torch.bmm(grad_V, self.g(x, **scenario)).squeeze(1))
+
+            # Barrier Lie derivaties
             L_f_Hs.append(torch.bmm(grad_H, self.f(x, **scenario).unsqueeze(-1)).squeeze(-1))
             L_g_Hs.append(torch.bmm(grad_H, self.g(x, **scenario)).squeeze(1))
 
@@ -253,3 +285,110 @@ class CLF_CBF_QP_Net(nn.Module):
         relaxation /= n_scenarios
 
         return u, relaxation, V, Vdot, H, Hdot
+
+
+def lyapunov_loss(x, x0, net, clf_lambda, timestep=0.001, print_loss=False):
+    """
+    Compute a loss to train the Lyapunov function
+
+    args:
+        x: the points at which to evaluate the loss
+        x0: the origin
+        net: a CLF_CBF_QP_Net instance
+        clf_lambda: the rate parameter in the CLF condition
+        timestep: the timestep used to compute a finite-difference approximation of the
+                  Lyapunov function
+        print_loss: True to enable printing the values of component terms
+    returns:
+        loss: the loss for the given Lyapunov function
+    """
+    # Compute loss based on...
+    loss = 0.0
+    #   1.) squared value of the Lyapunov function at the origin
+    V0, _ = net.compute_lyapunov(x0)
+    loss += V0.pow(2).squeeze()
+
+    #   2.) A term to encourage satisfaction of CLF condition
+    u, r, V, _, _, _ = net(x)
+    # To compute the change in V, simulate x forward in time and check if V decreases in each
+    # scenario
+    lyap_descent_term = 0.0
+    for s in net.scenarios:
+        xdot = net.f(x, **s) + torch.bmm(net.g(x, **s), u.unsqueeze(-1)).squeeze()
+        x_next = x + timestep * xdot
+        V_next, _ = net.compute_lyapunov(x_next)
+        Vdot = V_next - V
+        lyap_descent_term += F.relu(Vdot.squeeze() + clf_lambda * V)
+    loss += lyap_descent_term.mean()
+
+    #   3.) A tuning term to encourage a quadratic-ish shape for V
+    lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
+    loss += lyap_tuning_term.mean()
+
+    #   4.) A term to discourage relaxations of the CLF condition
+    loss += r.mean()
+
+    if print_loss:
+        print(f"                     CLF origin: {V0.pow(2).squeeze().item()}")
+        print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
+        print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
+        print(f"            CLF relaxation term: {r.mean().item()}")
+
+    return loss
+
+
+def barrier_loss(x,
+                 safe_mask,
+                 unsafe_mask,
+                 net,
+                 cbf_lambda,
+                 timestep=0.001,
+                 eps=0.01,
+                 print_loss=False):
+    """
+    Compute a loss to train the barrier function
+
+    args:
+        x: the points at which to evaluate the loss
+        safe_mask: the points in x marked safe
+        unsafe_mask: the points in x marked unsafe
+        net: a CLF_CBF_QP_Net instance
+        cbf_lambda: the rate parameter in the CBF condition
+        timestep: the timestep used to compute a finite-difference approximation of the
+                  barrier function
+        eps: a parameter setting the buffer for strict inequalities
+        print_loss: True to enable printing the values of component terms
+    returns:
+        loss: the loss for the given barrier function
+    """
+    # Compute loss based on...
+    loss = 0.0
+    #   1.) term to encourage barrier H >= 0 in the safe region
+    H_safe, _ = net.compute_barrier(x[safe_mask])
+    safe_region_barrier_term = F.relu(eps - H_safe)
+    loss += safe_region_barrier_term.mean()
+
+    #   2.) term to encourage barrier H < 0 in the unsafe region
+    H_unsafe, _ = net.compute_barrier(x[unsafe_mask])
+    unsafe_region_barrier_term = F.relu(eps + H_unsafe)
+    loss += unsafe_region_barrier_term.mean()
+
+    #   3.) term to encourage satisfaction of CBF condition
+    u, _, _, _, H, _ = net(x)
+    # To compute the change in H, simulate x forward in time and check if the CBF condition is
+    # satisfied
+    barrier_dynamics_term = 0.0
+    for s in net.scenarios:
+        xdot = net.f(x, **s) + torch.bmm(net.g(x, **s), u.unsqueeze(-1)).squeeze()
+        x_next = x + timestep * xdot
+        H_next, _ = net.compute_barrier(x_next)
+        Hdot = H_next - H
+        barrier_dynamics_term += F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
+    loss += barrier_dynamics_term.mean()
+
+    if print_loss:
+        print(f"               safe region term: {safe_region_barrier_term.mean().item()}")
+        print(f"             unsafe region term: {unsafe_region_barrier_term.mean().item()}")
+        print(f"          barrier dynamics term: {barrier_dynamics_term.mean().item()}")
+
+    return loss

@@ -5,7 +5,7 @@ import torch.optim as optim
 from tqdm import trange
 
 
-from neural_clf.controllers.clf_cbf_qp_net import CLF_CBF_QP_Net
+from neural_clf.controllers.clf_cbf_qp_net import CLF_CBF_QP_Net, lyapunov_loss, barrier_loss
 from models.pvtol import (
     f_func,
     g_func,
@@ -24,7 +24,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 10000
 xz = torch.Tensor(N_train, 2).uniform_(-3, 3)
 xzdot = torch.Tensor(N_train, 2).uniform_(-3, 3)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -73,11 +73,8 @@ x_test = torch.cat((x_test, x_near_border), 0)
 # (z >= -0.25 is safe, z <= -0.5 is unsafe)
 safe_z = -0.1
 unsafe_z = -1
-safe_mask = x_test[:, 1] >= safe_z
-unsafe_mask = x_test[:, 1] <= unsafe_z
-# Augment the safe set to include only points in the training data
-x_safe_test = x_test[safe_mask]
-x_unsafe_test = x_test[unsafe_mask]
+safe_mask_test = x_test[:, 1] >= safe_z
+unsafe_mask_test = x_test[:, 1] <= unsafe_z
 
 # Create a tensor for the origin as well
 x0 = torch.zeros(1, 6)
@@ -97,15 +94,16 @@ clf_relaxation_penalty = 1.0
 cbf_relaxation_penalty = 10.0
 clf_lambda = 1.0
 cbf_lambda = 1.0
+timestep = 0.001
 n_hidden = 32
-learning_rate = 1e-4
+learning_rate = 1e-3
 epochs = 1000
 batch_size = 64
 
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.5 ** (epoch // 6))
+    lr = learning_rate * (0.5 ** (epoch // 10))
     # print(f"Learning rate: {round(max(lr, 1e-5), 6)}")
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
@@ -151,49 +149,20 @@ for epoch in range(epochs):
         # Segment into safe/unsafe
         safe_mask = x[:, 1] >= safe_z
         unsafe_mask = x[:, 1] <= unsafe_z
-        x_safe = x[safe_mask]
-        x_unsafe = x[unsafe_mask]
 
         # Zero parameter gradients before training
         optimizer.zero_grad()
 
-        # Forward pass: compute the control input and required Lyapunov relaxation
-        u, r, V, Vdot, H, Hdot = clf_cbf_net(x)
-        # Also get the barrier function values on the safe and unsafe regions
-        if x_safe.nelement() > 0:
-            _, _, _, _, H_safe, _ = clf_cbf_net(x_safe)
-        if x_unsafe.nelement() > 0:
-            _, _, _, _, H_unsafe, _ = clf_cbf_net(x_unsafe)
-        # Also get the Lyapunov function value at the origin
-        _, _, V0, _, _, _ = clf_cbf_net(x0)
-
-        # Compute loss based on...
+        # Compute loss
         loss = 0.0
-        #   1.) mean and max Lyapunov relaxation
-        loss += 0.1 * r.mean()
-        #   3.) squared value of the Lyapunov function at the origin
-        loss += 0.1 * V0.pow(2).squeeze()
-        #   4.) term to encourage satisfaction of CLF condition
-        lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        loss += 0.1 * lyap_descent_term.mean()
-        #   5.) tuning term to encourage a quadratic-ish shape for V
-        lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-        loss += 0.1 * lyap_tuning_term.mean()
-        #   6.) term to encourage barrier H >= 0 in the safe region
-        eps = 0.01
-        if x_safe.nelement() > 0:
-            safe_region_barrier_term = F.relu(eps - H_safe)
-            loss += safe_region_barrier_term.mean()
-        #   7.) term to encourage barrier H < 0 in the unsafe region
-        if x_unsafe.nelement() > 0:
-            unsafe_region_barrier_term = F.relu(eps + H_unsafe)
-            loss += unsafe_region_barrier_term.mean()
-        #   8.) term to encourage satisfaction of CBF condition
-        barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
-        loss += barrier_dynamics_term.mean()
-        #   9.) term to encourage shape of barrier function
-        barrier_tuning_term = (H.squeeze() - (x[:, 1] - (safe_z + unsafe_z) / 2.0))**2
-        loss += barrier_tuning_term.mean()
+        loss += lyapunov_loss(x, x0, clf_cbf_net, clf_lambda, timestep, print_loss=False)
+        loss += barrier_loss(x,
+                             safe_mask,
+                             unsafe_mask,
+                             clf_cbf_net,
+                             cbf_lambda,
+                             timestep,
+                             print_loss=False)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -208,45 +177,18 @@ for epoch in range(epochs):
 
     # Get loss on test set
     with torch.no_grad():
-        u, r, V, Vdot, H, Hdot = clf_cbf_net(x_test)
-        _, _, _, _, H_safe, _ = clf_cbf_net(x_safe_test)
-        _, _, _, _, H_unsafe, _ = clf_cbf_net(x_unsafe_test)
-        _, _, V0, _, _, _ = clf_cbf_net(x0)
-
-        # Compute loss based on...
+        # Compute loss...
         loss = 0.0
-        #   1.) mean and max Lyapunov relaxation
-        loss += 0.1 * r.mean()
-        #   3.) squared value of the Lyapunov function at the origin
-        loss += 0.1 * V0.pow(2).squeeze()
-        #   4.) term to encourage satisfaction of CLF condition
-        lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        loss += 0.1 * lyap_descent_term.mean()
-        #   5.) tuning term to encourage a quadratic-ish shape
-        lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
-        loss += 0.1 * lyap_tuning_term.mean()
-        #   6.) term to encourage barrier H >= 0 in the safe region
-        safe_region_barrier_term = F.relu(eps - H_safe)
-        loss += safe_region_barrier_term.mean()
-        #   7.) term to encourage barrier H < 0 in the unsafe region
-        unsafe_region_barrier_term = F.relu(eps + H_unsafe)
-        loss += unsafe_region_barrier_term.mean()
-        #   8.) term to encourage satisfaction of CBF condition
-        barrier_dynamics_term = F.relu(eps - Hdot.squeeze() - cbf_lambda * H.squeeze())
-        loss += barrier_dynamics_term.mean()
-        #   9.) term to encourage shape of barrier function
-        barrier_tuning_term = (H.squeeze() - (x_test[:, 1] - (safe_z + unsafe_z) / 2.0))**2
-        loss += 0.1 * barrier_tuning_term.mean()
+        loss += lyapunov_loss(x_test, x0, clf_cbf_net, clf_lambda, timestep, print_loss=True)
+        loss += barrier_loss(x_test,
+                             safe_mask_test,
+                             unsafe_mask_test,
+                             clf_cbf_net,
+                             cbf_lambda,
+                             timestep,
+                             print_loss=True)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
-        print(f"                     relaxation: {0.1 * r.mean().item()}")
-        print(f"                         origin: {0.1 * V0.pow(2).squeeze().item()}")
-        print(f"               CLF descent term: {0.1 * lyap_descent_term.mean().item()}")
-        print(f"                CLF tuning term: {0.1 * lyap_tuning_term.mean().item()}")
-        print(f"               safe region term: {safe_region_barrier_term.mean().item()}")
-        print(f"             unsafe region term: {unsafe_region_barrier_term.mean().item()}")
-        print(f"          barrier dynamics term: {barrier_dynamics_term.mean().item()}")
-        print(f"            barrier tuning term: {0.1 * barrier_tuning_term.mean().item()}")
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() <= min(test_losses):

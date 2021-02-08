@@ -34,7 +34,7 @@ sns.set_theme(context="talk", style="white")
 # Load the robust model from file
 filename = "logs/pvtol_robust_clf_cbf_qp.pth.tar"
 checkpoint = torch.load(filename)
-nominal_scenario = {"m": high_m, "inertia": high_I}
+nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
     {"m": low_m, "inertia": high_I},
@@ -45,7 +45,7 @@ robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                                     checkpoint['n_hidden'],
                                     n_controls,
                                     checkpoint['clf_lambda'],
-                                    checkpoint['cbf_lambda'],
+                                    50.0,  # checkpoint['cbf_lambda'],
                                     checkpoint['clf_relaxation_penalty'],
                                     checkpoint['cbf_relaxation_penalty'],
                                     f_func,
@@ -83,7 +83,7 @@ with torch.no_grad():
     ms = torch.Tensor(N_sim, 1).uniform_(high_m, high_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(high_I, high_I)
 
-    t_sim = 1
+    t_sim = 5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -166,7 +166,8 @@ with torch.no_grad():
             u = u_nominal(x_current, **nominal_scenario)
             u_sim_lqr[tstep, :, :] = u.squeeze()
             # Get the barrier function at the current state
-            _, _, V, _, H, _ = robust_clf_cbf_net(x_current)
+            V, _ = robust_clf_cbf_net.compute_lyapunov(x_current)
+            H, _ = robust_clf_cbf_net.compute_barrier(x_current)
             H_sim_lqr[tstep, :, 0] = H.squeeze()
             V_sim_lqr[tstep, :, 0] = V.squeeze()
             # Get the dynamics
