@@ -433,7 +433,8 @@ def controller_loss(x, net, print_loss=False):
     u_nominal = net.u_nominal(x, **net.nominal_scenario)
     u_filtered, _, _, _, _, _ = net(x)
 
-    controller_squared_error = ((u_nominal - u_filtered)**2).sum(dim=-1)
+    # Compute loss based on difference from nominal controller (e.g. LQR).
+    controller_squared_error = 1e-5 * ((u_nominal - u_filtered)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:
