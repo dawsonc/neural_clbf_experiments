@@ -101,7 +101,7 @@ clf_lambda = 1.0
 cbf_lambda = 10.0
 timestep = 0.001
 n_hidden = 32
-learning_rate = 1e-3
+learning_rate = 1e-4
 epochs = 1000
 batch_size = 64
 
