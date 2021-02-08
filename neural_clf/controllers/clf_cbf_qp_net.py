@@ -69,7 +69,7 @@ class CLF_CBF_QP_Net(nn.Module):
 
         # We also train a controller to learn the nominal control input
         self.Ufc_layer_1 = nn.Linear(n_input, n_hidden)
-        self.Ufc_layer_2 = nn.Linear(n_hidden, n_hidden)
+        self.Ufc_layer_2 = nn.Linear(n_hidden, n_controls)
 
         self.n_controls = n_controls
         self.clf_lambda = clf_lambda
