@@ -321,9 +321,9 @@ def lyapunov_loss(x, x0, net, clf_lambda, timestep=0.001, print_loss=False):
         lyap_descent_term += F.relu(Vdot.squeeze() + clf_lambda * V)
     loss += lyap_descent_term.mean()
 
-    #   3.) A tuning term to encourage a quadratic-ish shape for V
-    lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-    loss += lyap_tuning_term.mean()
+    # #   3.) A tuning term to encourage a quadratic-ish shape for V
+    # lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
+    # loss += lyap_tuning_term.mean()
 
     #   4.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
@@ -331,7 +331,7 @@ def lyapunov_loss(x, x0, net, clf_lambda, timestep=0.001, print_loss=False):
     if print_loss:
         print(f"                     CLF origin: {V0.pow(2).squeeze().item()}")
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
-        print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
+        # print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
         print(f"            CLF relaxation term: {r.mean().item()}")
 
     return loss
