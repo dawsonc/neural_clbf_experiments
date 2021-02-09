@@ -91,7 +91,7 @@ batch_size = 64
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.9 ** (epoch // 10))
+    lr = learning_rate * (0.1 ** (epoch // 1))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -99,7 +99,7 @@ def adjust_learning_rate(optimizer, epoch):
 # We start by allowing the QP to relax the CLF condition, but we'll gradually increase the
 # cost of doing so.
 def adjust_relaxation_penalty(clf_net, epoch):
-    penalty = relaxation_penalty * (2 ** (epoch // 3))
+    penalty = relaxation_penalty * (2 ** (epoch // 2))
     clf_net.relaxation_penalty = penalty
 
 
