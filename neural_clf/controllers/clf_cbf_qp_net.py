@@ -69,7 +69,8 @@ class CLF_CBF_QP_Net(nn.Module):
 
         # We also train a controller to learn the nominal control input
         self.Ufc_layer_1 = nn.Linear(n_input, n_hidden)
-        self.Ufc_layer_2 = nn.Linear(n_hidden, n_controls)
+        self.Ufc_layer_2 = nn.Linear(n_hidden, n_hidden)
+        self.Ufc_layer_3 = nn.Linear(n_hidden, n_controls)
 
         self.n_controls = n_controls
         self.clf_lambda = clf_lambda
@@ -205,7 +206,8 @@ class CLF_CBF_QP_Net(nn.Module):
         """
         tanh = nn.Tanh()
         Ufc1_act = tanh(self.Ufc_layer_1(x))
-        U = self.Ufc_layer_2(Ufc1_act)
+        Ufc2_act = tanh(self.Ufc_layer_2(Ufc1_act))
+        U = self.Ufc_layer_3(Ufc2_act)
 
         return U
 
@@ -276,18 +278,20 @@ class CLF_CBF_QP_Net(nn.Module):
             L_f_Hs.append(torch.bmm(grad_H, self.f(x, **scenario).unsqueeze(-1)).squeeze(-1))
             L_g_Hs.append(torch.bmm(grad_H, self.g(x, **scenario)).squeeze(1))
 
-        # To find the control input, we need to solve a QP
-        result = self.qp_layer(
-            *L_f_Vs, *L_g_Vs,
-            *L_f_Hs, *L_g_Hs,
-            V.unsqueeze(-1),
-            H,
-            u_nominal,
-            torch.tensor([self.clf_relaxation_penalty]),
-            torch.tensor([self.cbf_relaxation_penalty]),
-            solver_args={"max_iters": 5000000})
-        u = result[0]
-        rs = result[1:]
+        # # To find the control input, we need to solve a QP
+        # result = self.qp_layer(
+        #     *L_f_Vs, *L_g_Vs,
+        #     *L_f_Hs, *L_g_Hs,
+        #     V.unsqueeze(-1),
+        #     H,
+        #     u_nominal,
+        #     torch.tensor([self.clf_relaxation_penalty]),
+        #     torch.tensor([self.cbf_relaxation_penalty]),
+        #     solver_args={"max_iters": 5000000})
+        # u = result[0]
+        # rs = result[1:]
+        rs = [0.0] * len(self.scenarios)
+        u = u_nominal
 
         # Average across scenarios
         n_scenarios = len(self.scenarios)
