@@ -141,8 +141,8 @@ with torch.no_grad():
     ax3 = axs[1, 1]
     ax3.plot([], c=sns.color_palette("pastel")[0], label="LQR V")
     ax3.plot([], c=sns.color_palette("pastel")[1], label="CLF V")
-    # ax3.plot(t, V_sim_lqr[:, :, 0],
-    #          c=sns.color_palette("pastel")[0])
+    ax3.plot(t, V_sim_lqr[:, :, 0],
+             c=sns.color_palette("pastel")[0])
     ax3.plot(t[:t_final_rclfqp], V_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
     ax3.plot(t, t * 0.0, c="k")
