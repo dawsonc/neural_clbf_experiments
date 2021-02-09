@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 1e7
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -42,7 +42,7 @@ x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 10000
+N_test = 1e4
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
@@ -150,7 +150,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        # loss += controller_loss(x, clf_net, print_loss=False)
+        loss += controller_loss(x, clf_net, print_loss=False)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -176,7 +176,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=True)
-        # loss += controller_loss(x_test, clf_net, print_loss=True)
+        loss += controller_loss(x_test, clf_net, print_loss=True)
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 
         # Save the model if it's the best yet

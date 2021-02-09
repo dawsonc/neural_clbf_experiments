@@ -289,17 +289,12 @@ def lyapunov_loss(x,
     #   6.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
 
-    #   7.) A tuning term to encourage a quadratic-ish shape for V
-    lyap_tuning_term = 0.1 * F.relu(0.1*(x*x).sum(1) - V)
-    # loss += lyap_tuning_term.mean()
-
     if print_loss:
         print(f"                     CLF origin: {V0.pow(2).squeeze().item()}")
         print(f"           CLF safe region term: {safe_region_lyapunov_term.mean().item()}")
         print(f"         CLF unsafe region term: {unsafe_region_lyapunov_term.mean().item()}")
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
         print(f"            CLF relaxation term: {r.mean().item()}")
-        print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
 
     return loss
 
