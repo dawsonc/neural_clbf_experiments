@@ -189,6 +189,8 @@ for epoch in range(epochs):
                         'h': h,
                         'safe_z': safe_z,
                         'unsafe_z': unsafe_z,
+                        'safe_xz_radius': safe_xz_radius,
+                        'unsafe_xz_radius': unsafe_xz_radius,
                         'safe_level': safe_level,
                         'clf_lambda': clf_lambda,
                         'clf_net': clf_net.state_dict()}, filename)
