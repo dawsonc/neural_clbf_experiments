@@ -1,0 +1,3 @@
+[submodule "aerobench"]
+	path = aerobench
+	url = git@github.com:dawsonc/AeroBenchVVPython.git
