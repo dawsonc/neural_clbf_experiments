@@ -171,6 +171,7 @@ for epoch in range(epochs):
                               timestep,
                               print_loss=True)
         loss += controller_loss(x, clf_net, print_loss=True)
+        print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() < min(test_losses):
