@@ -76,7 +76,7 @@ x_test = torch.cat((x_test, x_near_border), 0)
 # Segment the test set into safe and unsafe regions
 # (z >= -0.25 is safe, z <= -0.5 is unsafe)
 safe_z = -1
-unsafe_z = -0.5
+unsafe_z = -2
 safe_mask_test = x_test[:, 1] >= safe_z
 unsafe_mask_test = x_test[:, 1] <= unsafe_z
 
