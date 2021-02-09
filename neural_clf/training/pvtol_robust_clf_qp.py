@@ -5,10 +5,13 @@ import torch.optim as optim
 from tqdm import trange
 
 
-from neural_clf.controllers.clf_qp_net import CLF_QP_Net
+from neural_clf.controllers.clf_qp_net import (
+    CLF_QP_Net,
+    lyapunov_loss,
+    controller_loss,
+)
 from models.pvtol import (
-    f_func,
-    g_func,
+    control_affine_dynamics,
     u_nominal,
     n_controls,
     n_dims,
@@ -24,43 +27,44 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000
+N_train = 1000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
-# Take some extra samples near the origin to make sure the stabilization is smooth
-xy = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
-xydot = torch.Tensor(N_train, 2).uniform_(-1, 1)
-theta = torch.Tensor(N_train, 1).uniform_(-1, 1)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-1, 1)
-x_near_origin = torch.cat((xy, theta, xydot, theta_dot), 1)
-x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 500
+N_test = 100000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 
-# Create a tensor for the origin as well
+# Create a tensor for the origin as well, which is our goal
 x0 = torch.zeros(1, 6)
+
+# Also define the safe and unsafe regions
+safe_z = -0.1
+unsafe_z = -0.5
+safe_mask_test = x_test[:, 1] >= safe_z
+unsafe_mask_test = x_test[:, 1] <= unsafe_z
 
 # Define the scenarios
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    {"m": low_m, "inertia": high_I},
-    {"m": high_m, "inertia": low_I},
-    {"m": high_m, "inertia": high_I},
+    # {"m": low_m, "inertia": high_I},
+    # {"m": high_m, "inertia": low_I},
+    # {"m": high_m, "inertia": high_I},
 ]
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 1.0
-clf_lambda = 1
+clf_lambda = 1.0
+safe_level = 1.0
+timestep = 0.001
 n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
@@ -82,9 +86,11 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 
 # Instantiate the network
+filename = "logs/pvtol_robust_clf_qp.pth.tar"
+checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
-                     f_func, g_func, u_nominal, scenarios, nominal_scenario,
-                     allow_relax=False)
+                     control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
+# clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
@@ -106,26 +112,25 @@ for epoch in range(epochs):
         indices = permutation[i:i+batch_size]
         x = x_train[indices]
 
+        # Segment into safe/unsafe
+        safe_mask = x[:, 1] >= safe_z
+        unsafe_mask = x[:, 1] <= unsafe_z
+
         # Zero parameter gradients before training
         optimizer.zero_grad()
 
-        # Forward pass: compute the control input and required Lyapunov relaxation
-        u, r, V, Vdot = clf_net(x)
-        # Also get the Lyapunov function value at the origin
-        _, _, V0, _ = clf_net(x0)
-
-        # Compute loss based on...
+        # Compute loss
         loss = 0.0
-        #   1.) mean and max Lyapunov relaxation
-        loss += r.mean()
-        #   3.) squared value of the Lyapunov function at the origin
-        loss += V0.pow(2).squeeze()
-        #   4.) term to encourage satisfaction of CLF condition
-        lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        loss += lyap_descent_term.mean()
-        #   5.) tuning term to encourage a quadratic-ish shape
-        lyap_tuning_term = F.relu(0.1*(x*x).sum(1) - V)
-        loss += 0.1 * lyap_tuning_term.mean()
+        loss += lyapunov_loss(x,
+                              x0,
+                              safe_mask,
+                              unsafe_mask,
+                              clf_net,
+                              clf_lambda,
+                              safe_level,
+                              timestep,
+                              print_loss=False)
+        loss += controller_loss(x, clf_net, print_loss=False)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -140,27 +145,18 @@ for epoch in range(epochs):
 
     # Get loss on test set
     with torch.no_grad():
-        u, r, V, Vdot = clf_net(x_test)
-        _, _, V0, _ = clf_net(x0)
-
-        # Compute loss based on...
+        # Compute loss
         loss = 0.0
-        #   1.) mean and max Lyapunov relaxation
-        loss += r.mean()
-        #   3.) squared value of the Lyapunov function at the origin
-        loss += V0.pow(2).squeeze()
-        #   4.) term to encourage satisfaction of CLF condition
-        lyap_descent_term = F.relu(Vdot.squeeze() + clf_lambda * V)
-        loss += lyap_descent_term.mean()
-        #   5.) tuning term to encourage a quadratic-ish shape
-        lyap_tuning_term = F.relu(0.1*(x_test*x_test).sum(1) - V)
-        loss += 0.1 * lyap_tuning_term.mean()
-
-        print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
-        print(f"                     relaxation: {r.mean().item()}")
-        print(f"                         origin: {V0.pow(2).squeeze().item()}")
-        print(f"                   descent term: {lyap_descent_term.mean().item()}")
-        print(f"                    tuning term: {0.1 * lyap_tuning_term.mean().item()}")
+        loss += lyapunov_loss(x_test,
+                              x0,
+                              safe_mask_test,
+                              unsafe_mask_test,
+                              clf_net,
+                              clf_lambda,
+                              safe_level,
+                              timestep,
+                              print_loss=True)
+        loss += controller_loss(x, clf_net, print_loss=True)
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() < min(test_losses):
@@ -170,6 +166,9 @@ for epoch in range(epochs):
                         'relaxation_penalty': relaxation_penalty,
                         'G': G,
                         'h': h,
+                        'safe_z': safe_z,
+                        'unsafe_z': unsafe_z,
+                        'safe_level': safe_level,
                         'clf_lambda': clf_lambda,
                         'clf_net': clf_net.state_dict()}, filename)
         test_losses.append(loss.item())
