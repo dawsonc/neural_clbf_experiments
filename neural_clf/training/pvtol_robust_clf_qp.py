@@ -27,20 +27,34 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 500000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
+# Add some training data just around the origin
+xz = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
+xzdot = torch.Tensor(N_train, 2).uniform_(-1, 1)
+theta = torch.Tensor(N_train, 1).uniform_(-1, 1)
+theta_dot = torch.Tensor(N_train, 1).uniform_(-1, 1)
+x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
+x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 100000
+N_test = 50000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
+# Also add some test data just around the origin
+xz = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
+xzdot = torch.Tensor(N_test, 2).uniform_(-1, 1)
+theta = torch.Tensor(N_test, 1).uniform_(-1, 1)
+theta_dot = torch.Tensor(N_test, 1).uniform_(-1, 1)
+x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
+x_test = torch.cat((x_test, x_near_origin), 0)
 
 # Create a tensor for the origin as well, which is our goal
 x0 = torch.zeros(1, 6)
@@ -62,7 +76,7 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 1.0
-clf_lambda = 1.0
+clf_lambda = 10.0
 safe_level = 1.0
 timestep = 0.001
 n_hidden = 48
@@ -90,7 +104,7 @@ filename = "logs/pvtol_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)

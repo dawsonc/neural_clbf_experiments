@@ -55,13 +55,14 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
+    x_sim_start[:, 1] = 1.0
     x_sim_start[:, 4] = -1.0
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
 
-    t_sim = 1
+    t_sim = 4
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -92,6 +93,9 @@ with torch.no_grad():
                 x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclfqp = tstep
+
+            if Vdot > 0:
+                break
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
@@ -147,6 +151,14 @@ with torch.no_grad():
              c=sns.color_palette("pastel")[1])
     ax3.plot(t, t * 0.0, c="k")
     ax3.legend()
+
+    ax2 = axs[0, 1]
+    ax2.plot([], c=sns.color_palette("pastel")[0], label="LQR dV/dt")
+    ax2.plot([], c=sns.color_palette("pastel")[1], label="CLF dV/dt")
+    ax2.plot(t[:t_final_rclfqp], Vdot_sim_rclfqp[:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[1])
+    ax2.plot(t, t * 0.0, c="k")
+    ax2.legend()
 
     ax4 = axs[1, 0]
     ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR u1")
