@@ -27,32 +27,32 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 500000
+N_train = 100000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Add some training data just around the origin
-xz = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
-xzdot = torch.Tensor(N_train, 2).uniform_(-5, 5)
-theta = torch.Tensor(N_train, 1).uniform_(-5, 5)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-5, 5)
+xz = torch.Tensor(2 * N_train, 2).uniform_(-1, 1)
+xzdot = torch.Tensor(2 * N_train, 2).uniform_(-5, 5)
+theta = torch.Tensor(2 * N_train, 1).uniform_(-5, 5)
+theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-5, 5)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 50000
+N_test = 10000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Also add some test data just around the origin
-xz = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
-xzdot = torch.Tensor(N_test, 2).uniform_(-5, 5)
-theta = torch.Tensor(N_test, 1).uniform_(-5, 5)
-theta_dot = torch.Tensor(N_test, 1).uniform_(-5, 5)
+xz = torch.Tensor(2 * N_test, 2).uniform_(-1, 1)
+xzdot = torch.Tensor(2 * N_test, 2).uniform_(-5, 5)
+theta = torch.Tensor(2 * N_test, 1).uniform_(-5, 5)
+theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-5, 5)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_origin), 0)
 
@@ -63,9 +63,11 @@ x0 = torch.zeros(1, 6)
 safe_z = -0.1
 unsafe_z = -0.5
 safe_xz_radius = 3
+unsafe_xz_radius = 3.5
 safe_mask_test = torch.logical_and(x_test[:, 1] >= safe_z,
                                    x_test[:, :2].norm(dim=-1) <= safe_xz_radius)
-unsafe_mask_test = x_test[:, 1] <= unsafe_z
+unsafe_mask_test = torch.logical_or(x_test[:, 1] <= unsafe_z,
+                                    x_test[:, :2].norm(dim=-1) >= unsafe_xz_radius)
 
 # Define the scenarios
 nominal_scenario = {"m": low_m, "inertia": low_I}
@@ -79,7 +81,7 @@ scenarios = [
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 1.0
 clf_lambda = 10.0
-safe_level = 1.0
+safe_level = 5.0
 timestep = 0.001
 n_hidden = 48
 learning_rate = 0.001
@@ -131,7 +133,8 @@ for epoch in range(epochs):
         # Segment into safe/unsafe
         safe_mask = torch.logical_and(x[:, 1] >= safe_z,
                                       x[:, :2].norm(dim=-1) <= safe_xz_radius)
-        unsafe_mask = x[:, 1] <= unsafe_z
+        unsafe_mask = x[:, 1] <= torch.logical_or(x[:, 1] <= unsafe_z,
+                                                  x[:, :2].norm(dim=-1) >= unsafe_xz_radius)
 
         # Zero parameter gradients before training
         optimizer.zero_grad()

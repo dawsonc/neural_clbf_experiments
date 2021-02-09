@@ -55,7 +55,7 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, 1] = 1.0
+    x_sim_start[:, 1] = 0.5
     x_sim_start[:, 4] = -2.0
 
     # Get a random distribution of masses and inertias
@@ -93,9 +93,6 @@ with torch.no_grad():
                 x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclfqp = tstep
-
-            if Vdot > 2:
-                break
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
