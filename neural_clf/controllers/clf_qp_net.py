@@ -282,8 +282,8 @@ def lyapunov_loss(x,
         xdot = f + torch.bmm(g, u.unsqueeze(-1)).squeeze()
         x_next = x + timestep * xdot
         V_next, _ = net.compute_lyapunov(x_next)
-        change_in_lyap = V_next.squeeze() - (1 - clf_lambda * timestep) * V
-        lyap_descent_term += F.relu(change_in_lyap)
+        Vdot = (V_next.squeeze() - V.squeeze()) / timestep
+        lyap_descent_term += F.relu(Vdot + clf_lambda * V.squeeze())
     loss += lyap_descent_term.mean()
 
     #   6.) A term to discourage relaxations of the CLF condition

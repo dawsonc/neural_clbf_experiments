@@ -150,7 +150,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        loss += controller_loss(x, clf_net, print_loss=False)
+        # loss += controller_loss(x, clf_net, print_loss=False)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -176,7 +176,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=True)
-        loss += controller_loss(x, clf_net, print_loss=True)
+        # loss += controller_loss(x_test, clf_net, print_loss=True)
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 
         # Save the model if it's the best yet
