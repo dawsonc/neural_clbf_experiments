@@ -62,7 +62,9 @@ x0 = torch.zeros(1, 6)
 # Also define the safe and unsafe regions
 safe_z = -0.1
 unsafe_z = -0.5
-safe_mask_test = x_test[:, 1] >= safe_z
+safe_xz_radius = 3
+safe_mask_test = torch.logical_and(x_test[:, 1] >= safe_z,
+                                   x_test[:, :2].norm(dim=-1) <= safe_xz_radius)
 unsafe_mask_test = x_test[:, 1] <= unsafe_z
 
 # Define the scenarios
@@ -127,7 +129,8 @@ for epoch in range(epochs):
         x = x_train[indices]
 
         # Segment into safe/unsafe
-        safe_mask = x[:, 1] >= safe_z
+        safe_mask = torch.logical_and(x[:, 1] >= safe_z,
+                                      x[:, :2].norm(dim=-1) <= safe_xz_radius)
         unsafe_mask = x[:, 1] <= unsafe_z
 
         # Zero parameter gradients before training

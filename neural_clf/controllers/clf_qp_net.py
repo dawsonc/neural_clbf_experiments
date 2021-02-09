@@ -291,7 +291,7 @@ def lyapunov_loss(x,
 
     #   7.) A tuning term to encourage a quadratic-ish shape for V
     lyap_tuning_term = 0.1 * F.relu(0.1*(x*x).sum(1) - V)
-    loss += lyap_tuning_term.mean()
+    # loss += lyap_tuning_term.mean()
 
     if print_loss:
         print(f"                     CLF origin: {V0.pow(2).squeeze().item()}")
