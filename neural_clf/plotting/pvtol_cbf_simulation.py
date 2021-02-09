@@ -34,7 +34,7 @@ sns.set_theme(context="talk", style="white")
 # Load the robust model from file
 filename = "logs/pvtol_robust_clf_cbf_qp.pth.tar"
 checkpoint = torch.load(filename)
-nominal_scenario = {"m": low_m, "inertia": low_I}
+nominal_scenario = {"m": high_m, "inertia": high_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
     {"m": low_m, "inertia": high_I},
@@ -76,7 +76,7 @@ with torch.no_grad():
     x_sim_start[:, 0] = 0.0
     x_sim_start[:, 1] = 0.0
     x_sim_start[:, 3] = 0.0
-    x_sim_start[:, 4] = -2.0
+    x_sim_start[:, 4] = -1.0
     x_sim_start[:, 5] = 0.0
 
     # Get a random distribution of masses and inertias
