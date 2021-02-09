@@ -279,20 +279,20 @@ class CLF_CBF_QP_Net(nn.Module):
             L_f_Hs.append(torch.bmm(grad_H, f.unsqueeze(-1)).squeeze(-1))
             L_g_Hs.append(torch.bmm(grad_H, g).squeeze(1))
 
-        # # To find the control input, we need to solve a QP
-        # result = self.qp_layer(
-        #     *L_f_Vs, *L_g_Vs,
-        #     *L_f_Hs, *L_g_Hs,
-        #     V.unsqueeze(-1),
-        #     H,
-        #     u_nominal,
-        #     torch.tensor([self.clf_relaxation_penalty]),
-        #     torch.tensor([self.cbf_relaxation_penalty]),
-        #     solver_args={"max_iters": 5000000})
-        # u = result[0]
-        # rs = result[1:]
-        rs = [torch.tensor([0.0])] * len(self.scenarios)
-        u = u_learned + self.u_nominal(x, **self.nominal_scenario)
+        # To find the control input, we need to solve a QP
+        result = self.qp_layer(
+            *L_f_Vs, *L_g_Vs,
+            *L_f_Hs, *L_g_Hs,
+            V.unsqueeze(-1),
+            H,
+            u_learned + self.u_nominal(x, **self.nominal_scenario),
+            torch.tensor([self.clf_relaxation_penalty]),
+            torch.tensor([self.cbf_relaxation_penalty]),
+            solver_args={"max_iters": 5000000})
+        u = result[0]
+        rs = result[1:]
+        # rs = [torch.tensor([0.0])] * len(self.scenarios)
+        # u = u_learned + self.u_nominal(x, **self.nominal_scenario)
 
         # Average across scenarios
         n_scenarios = len(self.scenarios)

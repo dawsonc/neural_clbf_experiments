@@ -6,8 +6,7 @@ import seaborn as sns
 
 from neural_clf.controllers.clf_cbf_qp_net import CLF_CBF_QP_Net
 from models.pvtol import (
-    f_func,
-    g_func,
+    control_affine_dynamics,
     u_nominal,
     n_controls,
     n_dims,
@@ -39,8 +38,7 @@ clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                              checkpoint['cbf_lambda'],
                              checkpoint['clf_relaxation_penalty'],
                              checkpoint['cbf_relaxation_penalty'],
-                             f_func,
-                             g_func,
+                             control_affine_dynamics,
                              u_nominal,
                              scenarios,
                              nominal_scenario,
@@ -62,7 +60,7 @@ with torch.no_grad():
         for j in range(n_grid):
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
-            # q = torch.tensor([[ 0.0577, -1.0022, -0.6185,  0.3205, -3.8008, -2.0763]])
+            q = torch.tensor([[-1.2611e-01, -1.0000e+00,  6.3998e-04, -2.4574e-01, -4.5575e-01, -6.1187e-02]])
             q[0, 0] += x[i]
             q[0, 1] = z[j]
             _, r, V, V_dot, H, H_dot = clf_cbf_net(q)

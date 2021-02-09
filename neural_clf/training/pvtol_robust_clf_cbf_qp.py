@@ -12,8 +12,7 @@ from neural_clf.controllers.clf_cbf_qp_net import (
     controller_loss,
 )
 from models.pvtol import (
-    f_func,
-    g_func,
+    control_affine_dynamics,
     u_nominal,
     n_controls,
     n_dims,
@@ -29,7 +28,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 100000
 xz = torch.Tensor(N_train, 2).uniform_(-3, 3)
 xzdot = torch.Tensor(N_train, 2).uniform_(-6, 6)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -128,7 +127,7 @@ filename = "logs/pvtol_robust_clf_cbf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_cbf_net = CLF_CBF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, cbf_lambda,
                              clf_relaxation_penalty, cbf_relaxation_penalty,
-                             f_func, g_func, u_nominal, scenarios, nominal_scenario,
+                             control_affine_dynamics, u_nominal, scenarios, nominal_scenario,
                              allow_cbf_relax=False)
 # clf_cbf_net.load_state_dict(checkpoint['clf_cbf_net'])
 

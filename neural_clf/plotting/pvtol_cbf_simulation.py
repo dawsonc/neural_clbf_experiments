@@ -6,8 +6,7 @@ import seaborn as sns
 
 from neural_clf.controllers.clf_cbf_qp_net import CLF_CBF_QP_Net
 from models.pvtol import (
-    f_func,
-    g_func,
+    control_affine_dynamics,
     u_nominal,
     n_controls,
     n_dims,
@@ -34,7 +33,7 @@ sns.set_theme(context="talk", style="white")
 # Load the robust model from file
 filename = "logs/pvtol_robust_clf_cbf_qp.pth.tar"
 checkpoint = torch.load(filename)
-nominal_scenario = {"m": high_m, "inertia": high_I}
+nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
     {"m": low_m, "inertia": high_I},
@@ -48,8 +47,7 @@ robust_clf_cbf_net = CLF_CBF_QP_Net(n_dims,
                                     checkpoint['cbf_lambda'],
                                     checkpoint['clf_relaxation_penalty'],
                                     checkpoint['cbf_relaxation_penalty'],
-                                    f_func,
-                                    g_func,
+                                    control_affine_dynamics,
                                     u_nominal,
                                     scenarios,
                                     nominal_scenario,
@@ -76,7 +74,7 @@ with torch.no_grad():
     x_sim_start[:, 0] = 0.0
     x_sim_start[:, 1] = 0.0
     x_sim_start[:, 3] = 0.0
-    x_sim_start[:, 4] = -1.0
+    x_sim_start[:, 4] = -2.0
     x_sim_start[:, 5] = 0.0
 
     # Get a random distribution of masses and inertias
@@ -115,16 +113,16 @@ with torch.no_grad():
             r_sim_rclfqp[tstep, :, 0] = r.squeeze()
             # Get the dynamics
             for i in range(N_sim):
-                f_val = f_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
-                g_val = g_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
+                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0),
+                                                       m=ms[i], inertia=inertias[i])
                 # Take one step to the future
                 xdot = f_val + g_val @ u[i, :]
                 x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclfqp = tstep
 
-            if x_sim_rclfqp[tstep, 0, 1] <= checkpoint["unsafe_z"]:
-                break
+            # if x_sim_rclfqp[tstep, 0, 1] <= checkpoint["unsafe_z"]:
+            #     break
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
@@ -172,8 +170,8 @@ with torch.no_grad():
             V_sim_lqr[tstep, :, 0] = V.squeeze()
             # Get the dynamics
             for i in range(N_sim):
-                f_val = f_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
-                g_val = g_func(x_current[i, :].unsqueeze(0), m=ms[i], inertia=inertias[i])
+                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0),
+                                                       m=ms[i], inertia=inertias[i])
                 # Take one step to the future
                 xdot = f_val + g_val @ u[i, :]
                 x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
