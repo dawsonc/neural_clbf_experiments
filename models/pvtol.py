@@ -75,6 +75,15 @@ def g_func(x, m=low_m, inertia=low_I):
     return g
 
 
+def control_affine_dynamics(x, m=low_m, inertia=low_I):
+    """
+    Return the control-affine dynamics evaluated at the given state
+
+    x = [[x, z, theta, vx, vz, theta_dot]_1, ...]
+    """
+    return f_func(x, m, inertia), g_func(x, m, inertia)
+
+
 def u_nominal(x, m=low_m, inertia=low_I):
     """
     Return the nominal controller for the system at state x, given by LQR

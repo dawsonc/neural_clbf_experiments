@@ -17,7 +17,7 @@ class CLF_CBF_QP_Net(nn.Module):
 
     def __init__(self, n_input, n_hidden, n_controls, clf_lambda, cbf_lambda,
                  clf_relaxation_penalty, cbf_relaxation_penalty,
-                 f_func, g_func, u_nominal, scenarios, nominal_scenario,
+                 control_affine_dynamics, u_nominal, scenarios, nominal_scenario,
                  G_u=torch.tensor([]), h_u=torch.tensor([]),
                  allow_cbf_relax=True):
         """
@@ -31,10 +31,11 @@ class CLF_CBF_QP_Net(nn.Module):
             cbf_lambda: desired exponential convergence rate for the CBF
             clf_relaxation_penalty: the penalty for relaxing the control lyapunov constraint
             cbf_relaxation_penalty: the penalty for relaxing the control barrier constraint
-            f_func: a function n_batch x n_dims -> n_batch x n_dims that returns the state-dependent
-                    part of the control-affine dynamics
-            g_func: a function n_batch x n_dims -> n_batch x n_dims x n_controls that returns the
-                    input coefficient matrix for the control-affine dynamics
+            control_affine_dynamics: a function that takes n_batch x n_dims and returns a tuple of:
+                f_func: a function n_batch x n_dims -> n_batch x n_dims that returns the
+                        state-dependent part of the control-affine dynamics
+                g_func: a function n_batch x n_dims -> n_batch x n_dims x n_controls that returns
+                        the input coefficient matrix for the control-affine dynamics
             u_nominal: a function n_batch x n_dims -> n_batch x n_controls that returns the nominal
                        control input for the system (even LQR about origin is fine)
             scenarios: a list of dictionaries specifying the parameters to pass to f_func and g_func
@@ -47,8 +48,7 @@ class CLF_CBF_QP_Net(nn.Module):
         super(CLF_CBF_QP_Net, self).__init__()
 
         # Save the dynamics and nominal controller functions
-        self.f = f_func
-        self.g = g_func
+        self.dynamics = control_affine_dynamics
         self.u_nominal = u_nominal
         assert len(scenarios) > 0, "Must pass at least one scenario"
         self.scenarios = scenarios
@@ -270,13 +270,14 @@ class CLF_CBF_QP_Net(nn.Module):
         L_f_Hs = []
         L_g_Hs = []
         for scenario in self.scenarios:
+            f, g = self.dynamics(x, **scenario)
             # Lyapunov Lie derivatives
-            L_f_Vs.append(torch.bmm(grad_V, self.f(x, **scenario).unsqueeze(-1)).squeeze(-1))
-            L_g_Vs.append(torch.bmm(grad_V, self.g(x, **scenario)).squeeze(1))
+            L_f_Vs.append(torch.bmm(grad_V, f.unsqueeze(-1)).squeeze(-1))
+            L_g_Vs.append(torch.bmm(grad_V, g).squeeze(1))
 
             # Barrier Lie derivaties
-            L_f_Hs.append(torch.bmm(grad_H, self.f(x, **scenario).unsqueeze(-1)).squeeze(-1))
-            L_g_Hs.append(torch.bmm(grad_H, self.g(x, **scenario)).squeeze(1))
+            L_f_Hs.append(torch.bmm(grad_H, f.unsqueeze(-1)).squeeze(-1))
+            L_g_Hs.append(torch.bmm(grad_H, g).squeeze(1))
 
         # # To find the control input, we need to solve a QP
         # result = self.qp_layer(
@@ -337,7 +338,8 @@ def lyapunov_loss(x, x0, net, clf_lambda, timestep=0.001, print_loss=False):
     # scenario
     lyap_descent_term = 0.0
     for s in net.scenarios:
-        xdot = net.f(x, **s) + torch.bmm(net.g(x, **s), u.unsqueeze(-1)).squeeze()
+        f, g = net.dynamics(x, **s)
+        xdot = f + torch.bmm(g, u.unsqueeze(-1)).squeeze()
         x_next = x + timestep * xdot
         V_next, _ = net.compute_lyapunov(x_next)
         Vdot = V_next - V
@@ -404,7 +406,8 @@ def barrier_loss(x,
     # satisfied
     barrier_dynamics_term = 0.0
     for s in net.scenarios:
-        xdot = net.f(x, **s) + torch.bmm(net.g(x, **s), u.unsqueeze(-1)).squeeze()
+        f, g = net.dynamics(x, **s)
+        xdot = f + torch.bmm(g, u.unsqueeze(-1)).squeeze()
         x_next = x + timestep * xdot
         H_next, _ = net.compute_barrier(x_next)
         Hdot = (H_next - H) / timestep
