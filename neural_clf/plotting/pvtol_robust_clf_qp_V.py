@@ -78,5 +78,5 @@ with torch.no_grad():
     axs[1].set_ylabel('$z$')
     axs[1].set_title('$dV/dt$')
 
-    plt.savefig("logs/plots/pvtol/lyap_contour.png")
+    # plt.savefig("logs/plots/pvtol/lyap_contour.png")
     plt.show()
