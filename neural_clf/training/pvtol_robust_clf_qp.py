@@ -31,13 +31,13 @@ N_train = 100000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-2*np.pi, 2*np.pi)
+theta_dot = torch.Tensor(N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Add some training data just around the origin
 xz = torch.Tensor(2 * N_train, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_train, 2).uniform_(-5, 5)
-theta = torch.Tensor(2 * N_train, 1).uniform_(-5, 5)
-theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-5, 5)
+xzdot = torch.Tensor(2 * N_train, 2).uniform_(-10, 10)
+theta = torch.Tensor(2 * N_train, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
@@ -50,9 +50,9 @@ theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Also add some test data just around the origin
 xz = torch.Tensor(2 * N_test, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_test, 2).uniform_(-5, 5)
-theta = torch.Tensor(2 * N_test, 1).uniform_(-5, 5)
-theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-5, 5)
+xzdot = torch.Tensor(2 * N_test, 2).uniform_(-10, 10)
+theta = torch.Tensor(2 * N_test, 1).uniform_(-np.pi, np.pi)
+theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-2 * np.pi, 2 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_origin), 0)
 
@@ -80,7 +80,7 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 1.0
-clf_lambda = 10.0
+clf_lambda = 0.0
 safe_level = 5.0
 timestep = 0.001
 n_hidden = 48

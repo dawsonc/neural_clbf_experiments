@@ -43,8 +43,8 @@ clf_net.load_state_dict(checkpoint['clf_net'])
 
 with torch.no_grad():
     n_grid = 50
-    x = torch.linspace(-4, 4, n_grid)
-    z = torch.linspace(-4, 4, n_grid)
+    x = torch.linspace(-1, 1, n_grid)
+    z = torch.linspace(-1, 1, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
     residuals = torch.zeros(n_grid, n_grid)
     V_values = torch.zeros(n_grid, n_grid)
