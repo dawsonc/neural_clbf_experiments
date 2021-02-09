@@ -1,0 +1,3 @@
+[submodule "models/f16_model"]
+	path = models/f16_model
+	url = git@github.com:dawsonc/AeroBenchVVPython.git
