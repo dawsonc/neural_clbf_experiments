@@ -180,7 +180,7 @@ class CLF_CBF_QP_Net(nn.Module):
         Hfc1_act = tanh(self.Hfc_layer_1(x))
         Hfc2_act = tanh(self.Hfc_layer_2(Hfc1_act))
         Hfc3_act = tanh(self.Hfc_layer_3(Hfc2_act))
-        H = self.Hfc_layer_4(Hfc3_act)
+        H = tanh(self.Hfc_layer_4(Hfc3_act))
 
         # ...and the Lie derivatives of the barrier function along f and g
 
@@ -191,7 +191,7 @@ class CLF_CBF_QP_Net(nn.Module):
         # Jacobian of third layer wrt input (n_batch x n_hidden x n_input)
         DHfc3_act = torch.bmm(torch.matmul(d_tanh_dx(Hfc3_act), self.Hfc_layer_3.weight), DHfc2_act)
         # Gradient of H wrt input (n_batch x 1 x n_input)
-        grad_H = torch.matmul(self.Hfc_layer_4.weight, DHfc3_act)
+        grad_H = torch.bmm(torch.matmul(d_tanh_dx(H), self.Hfc_layer_4.weight), DHfc3_act)
 
         return H, grad_H
 
@@ -262,7 +262,7 @@ class CLF_CBF_QP_Net(nn.Module):
         # Compute the Lyapunov and barrier functions
         V, grad_V = self.compute_lyapunov(x)
         H, grad_H = self.compute_barrier(x)
-        u_nominal = self.compute_controls(x)
+        u_learned = self.compute_controls(x)
 
         # Compute lie derivatives for each scenario
         L_f_Vs = []
@@ -291,7 +291,7 @@ class CLF_CBF_QP_Net(nn.Module):
         # u = result[0]
         # rs = result[1:]
         rs = [torch.tensor([0.0])] * len(self.scenarios)
-        u = u_nominal
+        u = u_learned + self.u_nominal(x, **self.nominal_scenario)
 
         # Average across scenarios
         n_scenarios = len(self.scenarios)
@@ -367,7 +367,7 @@ def barrier_loss(x,
                  cbf_lambda,
                  timestep=0.001,
                  eps_safe=0.01,
-                 eps_unsafe=0.1,
+                 eps_unsafe=0.01,
                  eps_dynamics=0.01,
                  print_loss=False):
     """
@@ -395,7 +395,7 @@ def barrier_loss(x,
 
     #   2.) term to encourage barrier H < 0 in the unsafe region
     H_unsafe, _ = net.compute_barrier(x[unsafe_mask])
-    unsafe_region_barrier_term = 10 * F.relu(eps_unsafe + H_unsafe)
+    unsafe_region_barrier_term = F.relu(eps_unsafe + H_unsafe)
     loss += unsafe_region_barrier_term.mean()
 
     #   3.) term to encourage satisfaction of CBF condition
@@ -407,7 +407,7 @@ def barrier_loss(x,
         xdot = net.f(x, **s) + torch.bmm(net.g(x, **s), u.unsqueeze(-1)).squeeze()
         x_next = x + timestep * xdot
         H_next, _ = net.compute_barrier(x_next)
-        Hdot = H_next - H
+        Hdot = (H_next - H) / timestep
         barrier_dynamics_term += F.relu(eps_dynamics - Hdot.squeeze() - cbf_lambda * H.squeeze())
     loss += barrier_dynamics_term.mean()
 
