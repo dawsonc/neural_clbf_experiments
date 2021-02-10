@@ -59,8 +59,8 @@ with torch.no_grad():
     x_sim_start[:, 4] = -2.0
 
     # Get a random distribution of masses and inertias
-    ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
-    inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
+    ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
+    inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
     t_sim = 10
     delta_t = 0.001
