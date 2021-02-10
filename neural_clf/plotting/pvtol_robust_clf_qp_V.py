@@ -66,8 +66,7 @@ with torch.no_grad():
     fig.set_size_inches(17, 8)
     contours = axs[0].contourf(x, z, V_values, cmap="magma", levels=20)
     plt.colorbar(contours, ax=axs[0], orientation="horizontal")
-    contours = axs[0].contour(x, z, V_values, colors=["blue"], levels=[checkpoint["safe_level"]],
-                              label="$V \\leq 5.0$")
+    contours = axs[0].contour(x, z, V_values, colors=["blue"], levels=[checkpoint["safe_level"]])
     axs[0].plot([x.min(), x.max()], [checkpoint["safe_z"], checkpoint["safe_z"]],
                 c="g", label="Safe")
     axs[0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]],
