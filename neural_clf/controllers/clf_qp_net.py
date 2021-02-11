@@ -299,7 +299,7 @@ def lyapunov_loss(x,
     return loss
 
 
-def controller_loss(x, x0, net, print_loss=False):
+def controller_loss(x, net, print_loss=False):
     """
     Compute a loss to train the filtered controller
 
