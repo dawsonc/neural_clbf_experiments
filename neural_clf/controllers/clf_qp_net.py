@@ -299,7 +299,7 @@ def lyapunov_loss(x,
     return loss
 
 
-def controller_loss(x, net, print_loss=False):
+def controller_loss(x, x0, net, print_loss=False):
     """
     Compute a loss to train the filtered controller
 
@@ -313,7 +313,7 @@ def controller_loss(x, net, print_loss=False):
     u_nominal = net.u_nominal(x, **net.nominal_scenario)
     u_learned, _, _, _ = net(x)
 
-    # Compute loss based on difference from nominal controller (e.g. LQR).
+    # Compute loss based on difference from nominal controller (e.g. LQR) at all points
     controller_squared_error = 1e-4 * ((u_nominal - u_learned)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
