@@ -55,15 +55,14 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, 0] = torch.Tensor(N_sim).uniform_(-1, 1)
-    x_sim_start[:, 1] = torch.Tensor(N_sim).uniform_(0.1, 0.75)
-    x_sim_start[:, 4] = torch.Tensor(N_sim).uniform_(-2.5, -1)
+    x_sim_start[:, 1] = 0.5
+    x_sim_start[:, 4] = -2.0
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
-    t_sim = 5
+    t_sim = 10
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -83,7 +82,7 @@ with torch.no_grad():
 
             u_sim_rclfqp[tstep, :, :] = u
             V_sim_rclfqp[tstep, :, 0] = V
-            Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
+            Vdot_sim_rclfqp[tstep, :, 0] = Vdot
             # Get the dynamics
             for i in range(N_sim):
                 f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0),
