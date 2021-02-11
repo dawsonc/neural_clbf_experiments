@@ -284,6 +284,7 @@ def lyapunov_loss(x,
         V_next, _ = net.compute_lyapunov(x_next)
         Vdot = (V_next.squeeze() - V.squeeze()) / timestep
         lyap_descent_term += F.relu(Vdot + clf_lambda * V.squeeze())
+    lyap_descent_term *= 100
     loss += lyap_descent_term.mean()
 
     #   6.) A term to discourage relaxations of the CLF condition
