@@ -22,53 +22,39 @@ from models.pvtol import (
     low_I,
     high_I,
 )
+from neural_clf.training.simulation import simulate_rollout
 
 
 torch.set_default_dtype(torch.float64)
 
-# First, sample training data uniformly from the state space
-N_train = 10000000
-xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
-xydot = torch.Tensor(N_train, 2).uniform_(-5, 5)
-theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
-x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
-# Add some training data just around the origin
-xz = torch.Tensor(2 * N_train, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_train, 2).uniform_(-5, 5)
-theta = torch.Tensor(2 * N_train, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
-x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
-x_train = torch.cat((x_train, x_near_origin), 0)
-# And some more, to make sure the stabilization is good
-xz = torch.Tensor(N_train, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(N_train, 2).uniform_(-1, 1)
-theta = torch.Tensor(N_train, 1).uniform_(-0.2 * np.pi, 0.2 * np.pi)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-0.5 * np.pi, 0.5 * np.pi)
-x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
-x_train = torch.cat((x_train, x_near_origin), 0)
+# Define the region of interest
+x_min, x_max = (-4.0, 4.0)
+y_min, y_max = (-4.0, 4.0)
+theta_min, theta_max = (-np.pi, np.pi)
+xdot_min, xdot_max = (-8.0, 8.0)
+ydot_min, ydot_max = (-8.0, 8.0)
+thetadot_min, thetadot_max = (-2 * np.pi, 2 * np.pi)
+
+# First, sample some training data uniformly from the state space
+# We'll augment this later with rollout episodes
+N_train = 100000
+x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
+x_train[:, 0] = x_train[:, 0] * (x_max - x_min) + x_min
+x_train[:, 1] = x_train[:, 1] * (y_max - y_min) + y_min
+x_train[:, 2] = x_train[:, 2] * (theta_max - theta_min) + theta_min
+x_train[:, 3] = x_train[:, 3] * (xdot_max - xdot_min) + xdot_min
+x_train[:, 4] = x_train[:, 4] * (ydot_max - ydot_min) + ydot_min
+x_train[:, 5] = x_train[:, 5] * (thetadot_max - thetadot_min) + thetadot_min
 
 # Also get some testing data, just to be principled
 N_test = 100000
-xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
-xydot = torch.Tensor(N_test, 2).uniform_(-5, 5)
-theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
-x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
-# Also add some test data just around the origin
-xz = torch.Tensor(2 * N_test, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_test, 2).uniform_(-5, 5)
-theta = torch.Tensor(2 * N_test, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-2 * np.pi, 2 * np.pi)
-x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
-x_test = torch.cat((x_test, x_near_origin), 0)
-# And some more, to make sure the stabilization is good
-xz = torch.Tensor(N_test, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(N_test, 2).uniform_(-1, 1)
-theta = torch.Tensor(N_test, 1).uniform_(-0.2 * np.pi, 0.2 * np.pi)
-theta_dot = torch.Tensor(N_test, 1).uniform_(-0.5 * np.pi, 0.5 * np.pi)
-x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
-x_test = torch.cat((x_test, x_near_origin), 0)
+x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
+x_test[:, 0] = x_test[:, 0] * (x_max - x_min) + x_min
+x_test[:, 1] = x_test[:, 1] * (y_max - y_min) + y_min
+x_test[:, 2] = x_test[:, 2] * (theta_max - theta_min) + theta_min
+x_test[:, 3] = x_test[:, 3] * (xdot_max - xdot_min) + xdot_min
+x_test[:, 4] = x_test[:, 4] * (ydot_max - ydot_min) + ydot_min
+x_test[:, 5] = x_test[:, 5] * (thetadot_max - thetadot_min) + thetadot_min
 
 # Create a tensor for the origin as well, which is our goal
 x0 = torch.zeros(1, 6)
@@ -78,6 +64,7 @@ safe_z = -0.1
 unsafe_z = -0.5
 safe_xz_radius = 3
 unsafe_xz_radius = 3.5
+# Compute mask of safe and unsafe test data
 safe_mask_test = torch.logical_and(x_test[:, 1] >= safe_z,
                                    x_test[:, :2].norm(dim=-1) <= safe_xz_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, 1] <= unsafe_z,
@@ -101,11 +88,13 @@ n_hidden = 64
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
+N_rollouts = 100
+rollout_length = 1.0
 
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.8 ** (epoch // 1))
+    lr = learning_rate * (0.9 ** (epoch // 1))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -131,6 +120,7 @@ optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
 test_losses = []
 for epoch in range(epochs):
     # Randomize presentation order
+    N_train = x_train.shape[0]
     permutation = torch.randperm(N_train)
 
     # Cool learning rate
@@ -139,6 +129,7 @@ for epoch in range(epochs):
     adjust_relaxation_penalty(clf_net, epoch)
 
     loss_acumulated = 0.0
+    print("Training...")
     for i in trange(0, N_train, batch_size):
         # Get state from training data
         indices = permutation[i:i+batch_size]
@@ -209,3 +200,25 @@ for epoch in range(epochs):
                         'clf_lambda': clf_lambda,
                         'clf_net': clf_net.state_dict()}, filename)
         test_losses.append(loss.item())
+
+    # Conduct rollouts to augment the training and test data
+    with torch.no_grad():
+        rollout_init_x = torch.Tensor(N_rollouts, n_dims).uniform_(0.0, 1.0)
+        rollout_init_x[:, 0] = rollout_init_x[:, 0] * (x_max - x_min) + x_min
+        rollout_init_x[:, 1] = rollout_init_x[:, 1] * (y_max - y_min) + y_min
+        rollout_init_x[:, 2] = rollout_init_x[:, 2] * (theta_max - theta_min) + theta_min
+        rollout_init_x[:, 3] = rollout_init_x[:, 3] * (xdot_max - xdot_min) + xdot_min
+        rollout_init_x[:, 4] = rollout_init_x[:, 4] * (ydot_max - ydot_min) + ydot_min
+        rollout_init_x[:, 5] = rollout_init_x[:, 5] * (thetadot_max - thetadot_min) + thetadot_min
+
+        rolled_out_x = simulate_rollout(rollout_init_x,
+                                        clf_net,
+                                        control_affine_dynamics,
+                                        timestep,
+                                        rollout_length,
+                                        nominal_scenario)
+        # Unwrap to give a bunch of samples of the state space
+        rolled_out_x = rolled_out_x.view(1, -1, n_dims).squeeze()
+
+        # Add the rollouts to the training data
+        x_train = torch.vstack((x_train, rolled_out_x))
