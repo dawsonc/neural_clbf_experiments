@@ -203,13 +203,13 @@ for epoch in range(epochs):
 
     # Conduct rollouts to augment the training and test data
     with torch.no_grad():
-        rollout_init_x = torch.Tensor(N_rollouts, n_dims).uniform_(0.0, 1.0)
-        rollout_init_x[:, 0] = rollout_init_x[:, 0] * (x_max - x_min) + x_min
-        rollout_init_x[:, 1] = rollout_init_x[:, 1] * (y_max - y_min) + y_min
-        rollout_init_x[:, 2] = rollout_init_x[:, 2] * (theta_max - theta_min) + theta_min
-        rollout_init_x[:, 3] = rollout_init_x[:, 3] * (xdot_max - xdot_min) + xdot_min
-        rollout_init_x[:, 4] = rollout_init_x[:, 4] * (ydot_max - ydot_min) + ydot_min
-        rollout_init_x[:, 5] = rollout_init_x[:, 5] * (thetadot_max - thetadot_min) + thetadot_min
+        rollout_init_x = torch.Tensor(N_rollouts, n_dims).uniform_(-2.0, 2.0)
+        # rollout_init_x[:, 0] = rollout_init_x[:, 0] * (x_max - x_min) + x_min
+        # rollout_init_x[:, 1] = rollout_init_x[:, 1] * (y_max - y_min) + y_min
+        # rollout_init_x[:, 2] = rollout_init_x[:, 2] * (theta_max - theta_min) + theta_min
+        # rollout_init_x[:, 3] = rollout_init_x[:, 3] * (xdot_max - xdot_min) + xdot_min
+        # rollout_init_x[:, 4] = rollout_init_x[:, 4] * (ydot_max - ydot_min) + ydot_min
+        # rollout_init_x[:, 5] = rollout_init_x[:, 5] * (thetadot_max - thetadot_min) + thetadot_min
 
         rolled_out_x = simulate_rollout(rollout_init_x,
                                         clf_net,

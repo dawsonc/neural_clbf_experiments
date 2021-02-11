@@ -5,7 +5,8 @@ from tqdm import tqdm
 
 def simulate_rollout(x_init, net, control_affine_dynamics, timestep, rollout_length, scenario):
     """
-    Simulate the execution of the given network controller from the given start points
+    Simulate the execution of the given network controller from the given start points.
+    Runs until a maximum time is reached
 
     args:
         x_init: N_rollouts x n_dims torch tensor of initial conditions
