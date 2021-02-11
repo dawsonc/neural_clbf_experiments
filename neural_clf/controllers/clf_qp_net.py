@@ -314,7 +314,7 @@ def controller_loss(x, net, print_loss=False):
     u_learned, _, _, _ = net(x)
 
     # Compute loss based on difference from nominal controller (e.g. LQR).
-    controller_squared_error = 1e-4 * ((u_nominal - u_learned)**2).sum(dim=-1)
+    controller_squared_error = 1e-6 * ((u_nominal - u_learned)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:
