@@ -35,7 +35,7 @@ with torch.no_grad():
     x_sim_start[:, 0] = 550    # vt
     x_sim_start[:, 4] = 200    # alt
 
-    t_sim = 6
+    t_sim = 15
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 

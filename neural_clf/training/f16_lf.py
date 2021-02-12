@@ -60,7 +60,7 @@ x0[0, 4] = 500  # alt
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 1.0
-clf_lambda = 0.1
+clf_lambda = 0.0
 safe_level = 1.0
 timestep = 0.001
 n_hidden = 64
@@ -71,7 +71,7 @@ batch_size = 64
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.8 ** (epoch // 1))
+    lr = learning_rate * (0.9 ** (epoch // 1))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
