@@ -30,7 +30,7 @@ pow_min, pow_max = (0, 10)
 nz_int_min, nz_int_max = (-20, 20)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 100000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0, 1)
 x_train[:, 0] = x_train[:, 0] * (vt_max - vt_min) + vt_min
 x_train[:, 1] = x_train[:, 1] * (alpha_max - alpha_min) + alpha_min
