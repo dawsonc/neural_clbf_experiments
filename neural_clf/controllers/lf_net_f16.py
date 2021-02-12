@@ -167,13 +167,15 @@ def lyapunov_loss(x,
     safe_mask = torch.logical_and(Nz >= -1.0, Nz <= 8)
     V_safe, _ = net.compute_lyapunov(x[safe_mask[:, 0], :])
     safe_region_lyapunov_term = F.relu(V_safe - safe_level)
-    loss += safe_region_lyapunov_term.mean()
+    if safe_region_lyapunov_term.numel() > 0:
+        loss += safe_region_lyapunov_term.mean()
 
     #   4.) term to encourage V >= safe_level in the unsafe region
     unsafe_mask = torch.logical_or(Nz <= -2.0, Nz >= 9)
     V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask[:, 0], :])
-    unsafe_region_lyapunov_term = F.relu(safe_level - V_unsafe)
-    loss += unsafe_region_lyapunov_term.mean()
+    unsafe_region_lyapunov_term = 1e2 * F.relu(safe_level - V_unsafe)
+    if unsafe_region_lyapunov_term.numel() > 0:
+        loss += unsafe_region_lyapunov_term.mean()
 
     if print_loss:
         print(f"                     CLF origin: {V0.pow(2).squeeze().item()}")
@@ -195,11 +197,12 @@ def controller_loss(x, net, print_loss=False):
     returns:
         loss: the loss for the given controller function
     """
-    u_nominal = net.u_nominal(x)
+    Nz_nominal, _, _, throttle_nominal = net.u_nominal(x)
+    u_nominal = torch.hstack((Nz_nominal.unsqueeze(-1), throttle_nominal.unsqueeze(-1)))
     u_learned, _, _ = net(x)
 
     # Compute loss based on difference from nominal controller (e.g. LQR) at all points
-    controller_squared_error = 1e-4 * ((u_nominal - u_learned)**2).sum(dim=-1)
+    controller_squared_error = 1e-6 * ((u_nominal - u_learned)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:

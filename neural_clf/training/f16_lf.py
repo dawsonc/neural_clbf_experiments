@@ -54,7 +54,7 @@ x_test[:, 6] = x_test[:, 6] * (nz_int_max - nz_int_min) + nz_int_min
 # Create a tensor for the origin as well, which is our goal
 x0 = torch.zeros(1, n_dims)
 x0[0, 0] = 1500  # Vt
-x0[0, 4] = 3600  # alt
+x0[0, 4] = 15000  # alt
 
 # Safe and unsafe regions are defined in lf_net_f16 loss functions
 
@@ -64,7 +64,7 @@ clf_lambda = 0.1
 safe_level = 1.0
 timestep = 0.001
 n_hidden = 64
-learning_rate = 0.001
+learning_rate = 0.01
 epochs = 1000
 batch_size = 64
 

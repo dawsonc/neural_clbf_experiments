@@ -81,7 +81,7 @@ def dynamics(x, u, return_Nz=False):
         return xdot
 
 
-def u_nominal(x, alt_setpoint=3600, vt_setpoint=1500):
+def u_nominal(x, alt_setpoint=15000, vt_setpoint=1500):
     """
     Return the nominal controller for the system at state x
 
@@ -90,12 +90,11 @@ def u_nominal(x, alt_setpoint=3600, vt_setpoint=1500):
     https://github.com/stanleybak/AeroBenchVVPython/blob/master/code/aerobench/examples/...
         straight_and_level/run.py
     """
-    # todo: torch-ify
-    airspeed = x[0]        # Vt            (ft/sec)
-    alpha = x[1]           # AoA           (rad)
-    theta = x[2]           # Pitch angle   (rad)
+    airspeed = x[:, 0]        # Vt            (ft/sec)
+    alpha = x[:, 1]           # AoA           (rad)
+    theta = x[:, 2]           # Pitch angle   (rad)
     gamma = theta - alpha  # Path angle    (rad)
-    h = x[4]               # Altitude      (feet)
+    h = x[:, 4]               # Altitude      (feet)
 
     # Proportional Control
     k_alt = 0.025
@@ -110,7 +109,7 @@ def u_nominal(x, alt_setpoint=3600, vt_setpoint=1500):
     K_vt = 0.25
     throttle = -K_vt * (airspeed - vt_setpoint)
 
-    return Nz, 0, 0, throttle
+    return Nz, torch.zeros_like(Nz), torch.zeros_like(Nz), throttle
 
 
 # def control_affine_dynamics(x):
