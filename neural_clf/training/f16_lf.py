@@ -21,16 +21,16 @@ from models.longitudinal_f16 import (
 torch.set_default_dtype(torch.float64)
 
 # Define the operational domain
-vt_min, vt_max = (1000, 2000)
+vt_min, vt_max = (400, 600)
 alpha_min, alpha_max = (-1, 1)
 theta_min, theta_max = (-1, 1)
 Q_min, Q_max = (-5, 5)
-alt_min, alt_max = (5000, 30000)
+alt_min, alt_max = (200, 800)
 pow_min, pow_max = (0, 10)
 nz_int_min, nz_int_max = (-20, 20)
 
 # First, sample training data uniformly from the state space
-N_train = 10000
+N_train = 1000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0, 1)
 x_train[:, 0] = x_train[:, 0] * (vt_max - vt_min) + vt_min
 x_train[:, 1] = x_train[:, 1] * (alpha_max - alpha_min) + alpha_min
@@ -41,7 +41,7 @@ x_train[:, 5] = x_train[:, 5] * (pow_max - pow_min) + pow_min
 x_train[:, 6] = x_train[:, 6] * (nz_int_max - nz_int_min) + nz_int_min
 
 # Also get some testing data, just to be principled
-N_test = 1000
+N_test = 10000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0, 1)
 x_test[:, 0] = x_test[:, 0] * (vt_max - vt_min) + vt_min
 x_test[:, 1] = x_test[:, 1] * (alpha_max - alpha_min) + alpha_min
@@ -53,8 +53,8 @@ x_test[:, 6] = x_test[:, 6] * (nz_int_max - nz_int_min) + nz_int_min
 
 # Create a tensor for the origin as well, which is our goal
 x0 = torch.zeros(1, n_dims)
-x0[0, 0] = 1500  # Vt
-x0[0, 4] = 15000  # alt
+x0[0, 0] = 500  # Vt
+x0[0, 4] = 500  # alt
 
 # Safe and unsafe regions are defined in lf_net_f16 loss functions
 
@@ -64,7 +64,7 @@ clf_lambda = 0.1
 safe_level = 1.0
 timestep = 0.001
 n_hidden = 64
-learning_rate = 0.01
+learning_rate = 0.001
 epochs = 1000
 batch_size = 64
 

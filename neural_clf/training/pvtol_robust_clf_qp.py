@@ -27,46 +27,32 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 50000000
+N_train = 10000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
-xydot = torch.Tensor(N_train, 2).uniform_(-5, 5)
+xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Add some training data just around the origin
 xz = torch.Tensor(2 * N_train, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_train, 2).uniform_(-5, 5)
+xzdot = torch.Tensor(2 * N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(2 * N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
-x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
-x_train = torch.cat((x_train, x_near_origin), 0)
-# And some more, to make sure the stabilization is good
-xz = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
-xzdot = torch.Tensor(N_train, 2).uniform_(-0.5, 0.5)
-theta = torch.Tensor(N_train, 1).uniform_(-0.2 * np.pi, 0.2 * np.pi)
-theta_dot = torch.Tensor(N_train, 1).uniform_(-0.5 * np.pi, 0.5 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
 N_test = 100000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
-xydot = torch.Tensor(N_test, 2).uniform_(-5, 5)
+xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Also add some test data just around the origin
 xz = torch.Tensor(2 * N_test, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_test, 2).uniform_(-5, 5)
+xzdot = torch.Tensor(2 * N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(2 * N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-2 * np.pi, 2 * np.pi)
-x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
-x_test = torch.cat((x_test, x_near_origin), 0)
-# And some more, to make sure the stabilization is good
-xz = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
-xzdot = torch.Tensor(N_test, 2).uniform_(-0.5, 0.5)
-theta = torch.Tensor(N_test, 1).uniform_(-0.2 * np.pi, 0.2 * np.pi)
-theta_dot = torch.Tensor(N_test, 1).uniform_(-0.5 * np.pi, 0.5 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_origin), 0)
 
@@ -97,7 +83,7 @@ relaxation_penalty = 1.0
 clf_lambda = 0.1
 safe_level = 1.0
 timestep = 0.001
-n_hidden = 64
+n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
@@ -105,7 +91,7 @@ batch_size = 64
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.8 ** (epoch // 1))
+    lr = learning_rate * (0.1 ** (epoch // 1))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 

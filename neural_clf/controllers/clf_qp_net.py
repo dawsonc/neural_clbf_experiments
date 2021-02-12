@@ -284,7 +284,6 @@ def lyapunov_loss(x,
         V_next, _ = net.compute_lyapunov(x_next)
         Vdot = (V_next.squeeze() - V.squeeze()) / timestep
         lyap_descent_term += F.relu(Vdot + clf_lambda * V.squeeze())
-    lyap_descent_term *= 100
     loss += lyap_descent_term.mean()
 
     #   6.) A term to discourage relaxations of the CLF condition
@@ -314,7 +313,7 @@ def controller_loss(x, net, print_loss=False):
     u_nominal = net.u_nominal(x, **net.nominal_scenario)
     u_learned, _, _, _ = net(x)
 
-    # Compute loss based on difference from nominal controller (e.g. LQR) at all points
+    # Compute loss based on difference from nominal controller (e.g. LQR).
     controller_squared_error = 1e-4 * ((u_nominal - u_learned)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 

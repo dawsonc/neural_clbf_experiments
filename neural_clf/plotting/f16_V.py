@@ -29,9 +29,9 @@ clf_net = LF_Net(n_dims,
 clf_net.load_state_dict(checkpoint['lf_net'])
 
 with torch.no_grad():
-    n_grid = 100
-    alt = torch.linspace(5000, 30000, n_grid)
-    vt = torch.linspace(1000, 2000, n_grid)
+    n_grid = 50
+    alt = torch.linspace(200, 800, n_grid)
+    vt = torch.linspace(400, 600, n_grid)
     V_values = torch.zeros(n_grid, n_grid)
     V_dot_values = torch.zeros(n_grid, n_grid)
     Nz_values = torch.zeros(n_grid, n_grid)
@@ -43,6 +43,9 @@ with torch.no_grad():
             q[0, 0] += vt[i]
             q[0, 4] += alt[j]
             u, V, V_dot = clf_net(q)
+            Nz_nominal, _, _, throttle_nominal = u_nominal(q, alt_setpoint=0)
+            Nz_nominal = torch.zeros_like(Nz_nominal) - 1000
+            u = torch.hstack((Nz_nominal.unsqueeze(-1), throttle_nominal.unsqueeze(-1)))
 
             V_values[j, i] = V
             V_dot_values[j, i] = V_dot
@@ -55,15 +58,15 @@ with torch.no_grad():
     plt.colorbar(contours, ax=axs[0], orientation="horizontal")
     contours = axs[0].contour(alt, vt, V_values, colors=["blue"], levels=[checkpoint["safe_level"]])
     contours = axs[0].contour(alt, vt, Nz_values, colors=["red", "orange"], levels=[-2, 9])
-    axs[0].set_xlabel('$alt$')
-    axs[0].set_ylabel('$vt$')
+    axs[0].set_xlabel('$vt$')
+    axs[0].set_ylabel('$alt$')
     axs[0].set_title('$V$')
     axs[0].legend()
 
-    contours = axs[1].contourf(alt, vt, V_dot_values, cmap="magma", levels=[-1, 0.0, 1.0])
+    contours = axs[1].contourf(vt, alt, V_dot_values, cmap="magma", levels=[-1, 0.0, 1.0])
     plt.colorbar(contours, ax=axs[1], orientation="horizontal")
-    axs[1].set_xlabel('$alt$')
-    axs[1].set_ylabel('$vt$')
+    axs[1].set_xlabel('$vt$')
+    axs[1].set_ylabel('$alt$')
     axs[1].set_title('$dV/dt$')
 
     # plt.savefig("logs/plots/pvtol/lyap_contour.png")

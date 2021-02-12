@@ -42,7 +42,7 @@ clf_net = CLF_QP_Net(n_dims,
 clf_net.load_state_dict(checkpoint['clf_net'])
 
 with torch.no_grad():
-    n_grid = 100
+    n_grid = 50
     x = torch.linspace(-4, 4, n_grid)
     z = torch.linspace(-4, 4, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
@@ -54,9 +54,9 @@ with torch.no_grad():
         for j in range(n_grid):
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
-            q = torch.tensor([[0.0401,  0.1927, -0.0126,  0.1185,  0.1608,  0.0361]])
-            q[0, 0] += x[i]
-            q[0, 1] += z[j]
+            # q = torch.tensor([[0.0129, -0.1149, -0.0083,  0.0534, -2.0552,  0.0201]])
+            q[0, 0] = x[i]
+            q[0, 1] = z[j]
             _, r, V, V_dot = clf_net(q)
             residuals[j, i] = r
             V_values[j, i] = V
@@ -80,7 +80,7 @@ with torch.no_grad():
     axs[0].set_title('$V$')
     axs[0].legend()
 
-    contours = axs[1].contourf(x, z, V_dot_values, cmap="magma", levels=[-1, 0.0, 1.0])
+    contours = axs[1].contourf(x, z, V_dot_values, cmap="magma", levels=20)
     plt.colorbar(contours, ax=axs[1], orientation="horizontal")
     axs[1].set_xlabel('$x$')
     axs[1].set_ylabel('$z$')

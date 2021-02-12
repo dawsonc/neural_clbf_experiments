@@ -160,7 +160,7 @@ def lyapunov_loss(x,
     V_next, _ = net.compute_lyapunov(x_next)
     Vdot = (V_next.squeeze() - V.squeeze()) / timestep
     lyap_descent_term = F.relu(Vdot + clf_lambda * V.squeeze())
-    lyap_descent_term *= 100
+    # lyap_descent_term *= 100
     loss += lyap_descent_term.mean()
 
     #   3.) term to encourage V <= safe_level in the safe region
@@ -173,7 +173,7 @@ def lyapunov_loss(x,
     #   4.) term to encourage V >= safe_level in the unsafe region
     unsafe_mask = torch.logical_or(Nz <= -2.0, Nz >= 9)
     V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask[:, 0], :])
-    unsafe_region_lyapunov_term = 1e2 * F.relu(safe_level - V_unsafe)
+    unsafe_region_lyapunov_term = F.relu(safe_level - V_unsafe)
     if unsafe_region_lyapunov_term.numel() > 0:
         loss += unsafe_region_lyapunov_term.mean()
 
@@ -202,7 +202,7 @@ def controller_loss(x, net, print_loss=False):
     u_learned, _, _ = net(x)
 
     # Compute loss based on difference from nominal controller (e.g. LQR) at all points
-    controller_squared_error = 1e-6 * ((u_nominal - u_learned)**2).sum(dim=-1)
+    controller_squared_error = 1e-4 * ((u_nominal - u_learned)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:

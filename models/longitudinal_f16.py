@@ -81,7 +81,7 @@ def dynamics(x, u, return_Nz=False):
         return xdot
 
 
-def u_nominal(x, alt_setpoint=15000, vt_setpoint=1500):
+def u_nominal(x, alt_setpoint=500, vt_setpoint=500):
     """
     Return the nominal controller for the system at state x
 
