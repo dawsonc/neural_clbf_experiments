@@ -33,7 +33,7 @@ with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = 550    # vt
-    x_sim_start[:, 4] = 200    # alt
+    x_sim_start[:, 4] = 550    # alt
 
     t_sim = 15
     delta_t = 0.001
