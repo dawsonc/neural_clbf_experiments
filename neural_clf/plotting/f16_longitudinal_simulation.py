@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from neural_clf.controllers.lf_net_f16 import LF_Net
-from models.longitudinal_f16 import (
+from models.f16_longitudinal import (
     dynamics,
     u_nominal,
     n_controls,

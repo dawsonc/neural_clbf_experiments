@@ -93,7 +93,7 @@ def u_nominal(x, alt_setpoint=500, vt_setpoint=500):
     airspeed = x[:, 0]        # Vt            (ft/sec)
     alpha = x[:, 1]           # AoA           (rad)
     theta = x[:, 2]           # Pitch angle   (rad)
-    gamma = theta - alpha  # Path angle    (rad)
+    gamma = theta - alpha     # Path angle    (rad)
     h = x[:, 4]               # Altitude      (feet)
 
     # Proportional Control
