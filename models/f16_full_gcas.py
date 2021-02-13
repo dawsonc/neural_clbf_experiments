@@ -1,10 +1,8 @@
 import torch
-import numpy as np
 
 from aerobench.highlevel.controlled_f16 import controlled_f16
 from aerobench.examples.gcas.gcas_autopilot import GcasAutopilot
 from aerobench.lowlevel.low_level_controller import LowLevelController
-from aerobench.util import StateIndex
 
 
 # AeroBench dynamics for the F16 fighter jet
@@ -32,8 +30,9 @@ def dynamics(x, u, return_Nz=False):
         model = "stevens"  # look-up table
         # model = "morelli"  # polynomial fit
         t = 0.0
-        xdot[batch, :], _, Nz_i, _, _ = controlled_f16(t, x[batch, :], u[batch, :],
-                                                       llc, f16_model=model)
+        xdot_i, _, Nz_i, _, _ = controlled_f16(t, x[batch, :], u[batch, :],
+                                               llc, f16_model=model)
+        xdot[batch, :] = torch.tensor(xdot_i)
 
         # Save the true z acceleration
         Nz[batch, 0] = Nz_i
@@ -66,10 +65,10 @@ def u_nominal(x, alt_setpoint=500, vt_setpoint=500):
         # If we are hurtling towards the ground and the plane isn't level, we need to try to
         # roll to get level
         if not gcas.is_roll_rate_low(x[batch, :]) or not gcas.are_wings_level(x[batch, :]):
-            u[batch, :] = gcas.roll_wings_level(x[batch, :])
+            u[batch, :] = torch.tensor(gcas.roll_wings_level(x[batch, :]))
             continue
 
         # If we are hurtling towards the ground and the plane IS level, then we need to pull up
-        u[batch, :] = gcas.pull_nose_level()
+        u[batch, :] = torch.tensor(gcas.pull_nose_level())
 
     return u

@@ -4,7 +4,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from neural_clf.controllers.lf_net_f16 import LF_Net
+from neural_clf.controllers.lf_net_f16_longitudinal import LF_Net
 from models.f16_longitudinal import (
     dynamics,
     u_nominal,
@@ -17,7 +17,7 @@ from models.f16_longitudinal import (
 sns.set_theme(context="talk", style="white")
 
 # Load the model from file
-filename = "logs/f16_lf.pth.tar"
+filename = "logs/f16_lf_longitudinal.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = LF_Net(n_dims,
                  checkpoint['n_hidden'],

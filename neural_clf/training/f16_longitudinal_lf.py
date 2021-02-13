@@ -5,7 +5,7 @@ import torch.optim as optim
 from tqdm import trange
 
 
-from neural_clf.controllers.lf_net_f16 import (
+from neural_clf.controllers.lf_net_f16_longitudinal import (
     LF_Net,
     lyapunov_loss,
     controller_loss,
@@ -84,7 +84,7 @@ def adjust_relaxation_penalty(lf_net, epoch):
 
 
 # Instantiate the network
-# filename = "logs/f16_lf.pth.tar"
+# filename = "logs/f16_lf_longitudinal.pth.tar"
 # checkpoint = torch.load(filename)
 lf_net = LF_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                 dynamics, u_nominal)
@@ -152,7 +152,7 @@ for epoch in range(epochs):
         # Save the model if it's the best yet
         if not test_losses or loss.item() < min(test_losses):
             print("saving new model")
-            filename = 'logs/f16_lf.pth.tar'
+            filename = 'logs/f16_lf_longitudinal.pth.tar'
             torch.save({'n_hidden': n_hidden,
                         'relaxation_penalty': relaxation_penalty,
                         'safe_level': safe_level,
