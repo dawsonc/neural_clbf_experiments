@@ -108,7 +108,7 @@ filename = "logs/pvtol_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
