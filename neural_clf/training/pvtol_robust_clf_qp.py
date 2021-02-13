@@ -82,7 +82,7 @@ scenarios = [
 relaxation_penalty = 1.0
 clf_lambda = 0.1
 safe_level = 1.0
-timestep = 0.001
+timestep = 0.01
 n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
@@ -108,7 +108,7 @@ filename = "logs/pvtol_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
