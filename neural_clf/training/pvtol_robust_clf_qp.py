@@ -73,13 +73,13 @@ unsafe_mask_test = torch.logical_or(x_test[:, 1] <= unsafe_z,
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": high_I},
-    # {"m": high_m, "inertia": low_I},
-    # {"m": high_m, "inertia": high_I},
+    {"m": low_m, "inertia": high_I},
+    {"m": high_m, "inertia": low_I},
+    {"m": high_m, "inertia": high_I},
 ]
 
 # Define hyperparameters and define the learning rate and penalty schedule
-relaxation_penalty = 1.0
+relaxation_penalty = 10.0
 clf_lambda = 0.1
 safe_level = 1.0
 timestep = 0.01
@@ -91,7 +91,7 @@ batch_size = 64
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 1))
+    lr = learning_rate * (0.1 ** (epoch // 4))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -184,7 +184,7 @@ for epoch in range(epochs):
             print("saving new model")
             filename = 'logs/pvtol_robust_clf_qp.pth.tar'
             torch.save({'n_hidden': n_hidden,
-                        'relaxation_penalty': relaxation_penalty,
+                        'relaxation_penalty': clf_net.relaxation_penalty,
                         'G': G,
                         'h': h,
                         'safe_z': safe_z,
