@@ -101,6 +101,7 @@ with torch.no_grad():
     x_sim_lqr[0, :, :] = x_sim_start
     u_sim_lqr = torch.zeros(num_timesteps, N_sim, n_controls)
     V_sim_lqr = torch.zeros(num_timesteps, N_sim, 1)
+    Vdot_sim_lqr = torch.zeros(num_timesteps, N_sim, 1)
     try:
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
@@ -108,7 +109,7 @@ with torch.no_grad():
             # Get the control input at the current state
             u = u_nominal(x_current, **nominal_scenario)
             # and measure the Lyapunov function value here
-            V, _ = robust_clf_net.compute_lyapunov(x_current)
+            V, grad_V = robust_clf_net.compute_lyapunov(x_current)
 
             u_sim_lqr[tstep, :, :] = u
             V_sim_lqr[tstep, :, 0] = V
@@ -119,6 +120,7 @@ with torch.no_grad():
                                                        inertia=inertias[i])
                 # Take one step to the future
                 xdot = f_val + g_val @ u[i, :]
+                Vdot_sim_lqr[tstep, :, 0] = grad_V @ xdot.T
                 x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
@@ -154,6 +156,8 @@ with torch.no_grad():
     ax2.plot([], c=sns.color_palette("pastel")[1], label="LF dV/dt")
     ax2.plot(t[:t_final_rclfqp], Vdot_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
+    ax2.plot(t, Vdot_sim_lqr[:, :, 0],
+             c=sns.color_palette("pastel")[0])
     ax2.plot(t, t * 0.0, c="k")
     ax2.legend()
 
