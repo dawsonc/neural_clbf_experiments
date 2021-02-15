@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 10000000
+N_train = 1000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -42,7 +42,7 @@ x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 100000
+N_test = 10000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
