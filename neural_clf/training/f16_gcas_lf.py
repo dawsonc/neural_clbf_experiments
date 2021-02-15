@@ -40,7 +40,7 @@ ps_int_min, ps_int_max = (-20, 20)
 nyr_int_min, nyr_int_max = (-20, 20)
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 1000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0, 1)
 x_train[:, StateIndex.VT] = x_train[:, StateIndex.VT] * (vt_max - vt_min) + vt_min
 x_train[:, StateIndex.ALPHA] = x_train[:, StateIndex.ALPHA] * (alpha_max - alpha_min) + alpha_min
@@ -60,7 +60,7 @@ x_train[:, 14] = x_train[:, 14] * (ps_int_max - ps_int_min) + ps_int_min
 x_train[:, 15] = x_train[:, 15] * (nyr_int_max - nyr_int_min) + nyr_int_min
 
 # Also get some testing data, to be principled
-N_test = 10000
+N_test = 50000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0, 1)
 x_test[:, StateIndex.VT] = x_test[:, StateIndex.VT] * (vt_max - vt_min) + vt_min
 x_test[:, StateIndex.ALPHA] = x_test[:, StateIndex.ALPHA] * (alpha_max - alpha_min) + alpha_min
@@ -110,7 +110,7 @@ n_hidden = 64
 learning_rate = 0.001
 epochs = 500
 batch_size = 64
-controller_penalty = 1e-3  # coefficient for loss for matching nominal controller
+controller_penalty = 1e-5  # coefficient for loss for matching nominal controller
 
 
 def adjust_learning_rate(optimizer, epoch):
