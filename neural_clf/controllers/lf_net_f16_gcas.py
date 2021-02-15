@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from aerobench.util import StateIndex
+
 
 def d_tanh_dx(tanh):
     return torch.diag_embed(1 - tanh**2)
@@ -157,7 +159,8 @@ def lyapunov_loss(x,
     loss = 0.0
     #   1.) squared value of the Lyapunov function at the goal
     V0, _ = net.compute_lyapunov(x_goal)
-    loss += V0.pow(2).mean()
+    goal_term = F.relu(-V0)
+    loss += goal_term.mean()
 
     #   2.) A term to encourage satisfaction of CLF condition
     u, V, _ = net(x)
@@ -172,21 +175,21 @@ def lyapunov_loss(x,
     loss += lyap_descent_term.mean()
 
     #   3.) term to encourage V <= safe_level in the safe region
-    safe_mask = x[:, 11] >= 100
+    safe_mask = x[:, StateIndex.ALT] >= 100
     V_safe, _ = net.compute_lyapunov(x[safe_mask])
     safe_region_lyapunov_term = F.relu(V_safe - safe_level)
     if safe_region_lyapunov_term.numel() > 0:
         loss += safe_region_lyapunov_term.mean()
 
     #   4.) term to encourage V >= safe_level in the unsafe region
-    unsafe_mask = x[:, 11] <= 0
+    unsafe_mask = x[:, StateIndex.ALT] <= 0
     V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask])
     unsafe_region_lyapunov_term = F.relu(safe_level - V_unsafe)
     if unsafe_region_lyapunov_term.numel() > 0:
         loss += unsafe_region_lyapunov_term.mean()
 
     if print_loss:
-        print(f"                     CLF origin: {V0.pow(2).mean().item()}")
+        print(f"                     CLF origin: {goal_term.mean().item()}")
         print(f"           CLF safe region term: {safe_region_lyapunov_term.mean().item()}")
         print(f"         CLF unsafe region term: {unsafe_region_lyapunov_term.mean().item()}")
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")

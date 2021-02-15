@@ -40,7 +40,7 @@ ps_int_min, ps_int_max = (-20, 20)
 nyr_int_min, nyr_int_max = (-20, 20)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 100000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0, 1)
 x_train[:, StateIndex.VT] = x_train[:, StateIndex.VT] * (vt_max - vt_min) + vt_min
 x_train[:, StateIndex.ALPHA] = x_train[:, StateIndex.ALPHA] * (alpha_max - alpha_min) + alpha_min
@@ -148,7 +148,7 @@ for epoch in range(epochs):
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(lf_net, epoch)
     # and gradually decrease the penalty for matching the nominal controller
-    controller_penalty *= 0.1 ** (epoch // 4)
+    controller_penalty *= 0.01 ** (epoch // 4)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
