@@ -128,7 +128,7 @@ with torch.no_grad():
     fig, axs = plt.subplots(2, 2)
     t = np.linspace(0, t_sim, num_timesteps)
     ax1 = axs[0, 0]
-    ax1.plot([], c=sns.color_palette("pastel")[1], label="LF")
+    ax1.plot([], c=sns.color_palette("pastel")[1], label="CLF")
     ax1.plot([], c=sns.color_palette("pastel")[0], label="LQR")
     ax1.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, 1],
              c=sns.color_palette("pastel")[1])
@@ -143,7 +143,7 @@ with torch.no_grad():
 
     ax3 = axs[1, 1]
     ax3.plot([], c=sns.color_palette("pastel")[0], label="LQR V")
-    ax3.plot([], c=sns.color_palette("pastel")[1], label="LF V")
+    ax3.plot([], c=sns.color_palette("pastel")[1], label="CLF V")
     ax3.plot(t, V_sim_lqr[:, :, 0],
              c=sns.color_palette("pastel")[0])
     ax3.plot(t[:t_final_rclfqp], V_sim_rclfqp[:t_final_rclfqp, :, 0],
@@ -153,7 +153,7 @@ with torch.no_grad():
 
     ax2 = axs[0, 1]
     ax2.plot([], c=sns.color_palette("pastel")[0], label="LQR dV/dt")
-    ax2.plot([], c=sns.color_palette("pastel")[1], label="LF dV/dt")
+    ax2.plot([], c=sns.color_palette("pastel")[1], label="CLF dV/dt")
     ax2.plot(t[:t_final_rclfqp], Vdot_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
     ax2.plot(t, Vdot_sim_lqr[:, :, 0],
@@ -164,8 +164,8 @@ with torch.no_grad():
     ax4 = axs[1, 0]
     ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR $u1$")
     ax4.plot([], c=sns.color_palette("pastel")[0], linestyle=":", label="LQR $u2$")
-    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="LF $u1$")
-    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle=":", label="LF $u2$")
+    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="CLF $u1$")
+    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle=":", label="CLF $u2$")
     ax4.plot()
     ax4.plot(t[:t_final_rclfqp], u_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1], linestyle="-")
