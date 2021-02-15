@@ -27,32 +27,32 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 10000000
+N_train = 1000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Add some training data just around the origin
-xz = torch.Tensor(2 * N_train, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_train, 2).uniform_(-10, 10)
-theta = torch.Tensor(2 * N_train, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-2 * np.pi, 2 * np.pi)
+xz = torch.Tensor(2 * N_train, 2).uniform_(-0.5, 0.5)
+xzdot = torch.Tensor(2 * N_train, 2).uniform_(-0.5, 0.5)
+theta = torch.Tensor(2 * N_train, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
+theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-1 * np.pi, 1 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 
 # Also get some testing data, just to be principled
-N_test = 100000
+N_test = 10000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-2*np.pi, 2*np.pi)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Also add some test data just around the origin
-xz = torch.Tensor(2 * N_test, 2).uniform_(-1, 1)
-xzdot = torch.Tensor(2 * N_test, 2).uniform_(-10, 10)
-theta = torch.Tensor(2 * N_test, 1).uniform_(-np.pi, np.pi)
-theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-2 * np.pi, 2 * np.pi)
+xz = torch.Tensor(2 * N_test, 2).uniform_(-0.5, 0.5)
+xzdot = torch.Tensor(2 * N_test, 2).uniform_(-0.5, 0.5)
+theta = torch.Tensor(2 * N_test, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
+theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-1 * np.pi, 1 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_origin), 0)
 
@@ -73,16 +73,16 @@ unsafe_mask_test = torch.logical_or(x_test[:, 1] <= unsafe_z,
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": high_I},
-    # {"m": high_m, "inertia": low_I},
-    # {"m": high_m, "inertia": high_I},
+    {"m": low_m, "inertia": high_I},
+    {"m": high_m, "inertia": low_I},
+    {"m": high_m, "inertia": high_I},
 ]
 
 # Define hyperparameters and define the learning rate and penalty schedule
-relaxation_penalty = 1.0
+relaxation_penalty = 10.0
 clf_lambda = 0.1
 safe_level = 1.0
-timestep = 0.001
+timestep = 0.01
 n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
@@ -91,7 +91,7 @@ batch_size = 64
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 1))
+    lr = learning_rate * (0.1 ** (epoch // 4))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -108,7 +108,7 @@ filename = "logs/pvtol_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
@@ -184,7 +184,7 @@ for epoch in range(epochs):
             print("saving new model")
             filename = 'logs/pvtol_robust_clf_qp.pth.tar'
             torch.save({'n_hidden': n_hidden,
-                        'relaxation_penalty': relaxation_penalty,
+                        'relaxation_penalty': clf_net.relaxation_penalty,
                         'G': G,
                         'h': h,
                         'safe_z': safe_z,

@@ -36,9 +36,9 @@ checkpoint = torch.load(filename)
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": high_I},
-    # {"m": high_m, "inertia": low_I},
-    # {"m": high_m, "inertia": high_I},
+    {"m": low_m, "inertia": high_I},
+    {"m": high_m, "inertia": low_I},
+    {"m": high_m, "inertia": high_I},
 ]
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
@@ -53,14 +53,14 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 1
+    N_sim = 10
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 1] = 0.5
     x_sim_start[:, 4] = -2.0
 
     # Get a random distribution of masses and inertias
-    ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
-    inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
+    ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
+    inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
 
     t_sim = 10
     delta_t = 0.001
@@ -82,7 +82,7 @@ with torch.no_grad():
 
             u_sim_rclfqp[tstep, :, :] = u
             V_sim_rclfqp[tstep, :, 0] = V
-            Vdot_sim_rclfqp[tstep, :, 0] = Vdot
+            Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
             # Get the dynamics
             for i in range(N_sim):
                 f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0),
@@ -101,6 +101,7 @@ with torch.no_grad():
     x_sim_lqr[0, :, :] = x_sim_start
     u_sim_lqr = torch.zeros(num_timesteps, N_sim, n_controls)
     V_sim_lqr = torch.zeros(num_timesteps, N_sim, 1)
+    Vdot_sim_lqr = torch.zeros(num_timesteps, N_sim, 1)
     try:
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
@@ -108,7 +109,7 @@ with torch.no_grad():
             # Get the control input at the current state
             u = u_nominal(x_current, **nominal_scenario)
             # and measure the Lyapunov function value here
-            V, _ = robust_clf_net.compute_lyapunov(x_current)
+            V, grad_V = robust_clf_net.compute_lyapunov(x_current)
 
             u_sim_lqr[tstep, :, :] = u
             V_sim_lqr[tstep, :, 0] = V
@@ -119,6 +120,7 @@ with torch.no_grad():
                                                        inertia=inertias[i])
                 # Take one step to the future
                 xdot = f_val + g_val @ u[i, :]
+                Vdot_sim_lqr[tstep, :, 0] = (grad_V @ xdot.T).squeeze()
                 x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
@@ -154,14 +156,16 @@ with torch.no_grad():
     ax2.plot([], c=sns.color_palette("pastel")[1], label="LF dV/dt")
     ax2.plot(t[:t_final_rclfqp], Vdot_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
+    ax2.plot(t, Vdot_sim_lqr[:, :, 0],
+             c=sns.color_palette("pastel")[0])
     ax2.plot(t, t * 0.0, c="k")
     ax2.legend()
 
     ax4 = axs[1, 0]
-    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR u1")
-    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle=":", label="LQR u1")
-    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="LF u1")
-    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle=":", label="LF u1")
+    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR $u1$")
+    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle=":", label="LQR $u2$")
+    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="LF $u1$")
+    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle=":", label="LF $u2$")
     ax4.plot()
     ax4.plot(t[:t_final_rclfqp], u_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1], linestyle="-")

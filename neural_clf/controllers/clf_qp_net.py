@@ -204,17 +204,17 @@ class CLF_QP_Net(nn.Module):
             L_f_Vs.append(torch.bmm(grad_V, f.unsqueeze(-1)).squeeze(-1))
             L_g_Vs.append(torch.bmm(grad_V, g).squeeze(1))
 
-        # # To find the control input, we need to solve a QP
-        # result = self.qp_layer(
-        #     *L_f_Vs, *L_g_Vs,
-        #     V.unsqueeze(-1),
-        #     u_learned + self.u_nominal(x, **self.nominal_scenario),
-        #     torch.tensor([self.clf_relaxation_penalty]),
-        #     solver_args={"max_iters": 5000000})
-        # u = result[0]
-        # rs = result[1:]
-        rs = [torch.tensor([0.0])] * len(self.scenarios)
-        u = u_learned
+        # To find the control input, we need to solve a QP
+        result = self.qp_layer(
+            *L_f_Vs, *L_g_Vs,
+            V.unsqueeze(-1),
+            u_learned,
+            torch.tensor([self.clf_relaxation_penalty]),
+            solver_args={"max_iters": 5000000})
+        u = result[0]
+        rs = result[1:]
+        # rs = [torch.tensor([0.0])] * len(self.scenarios)
+        # u = u_learned
 
         # Average across scenarios
         n_scenarios = len(self.scenarios)
@@ -314,7 +314,7 @@ def controller_loss(x, net, print_loss=False):
     u_learned, _, _, _ = net(x)
 
     # Compute loss based on difference from nominal controller (e.g. LQR).
-    controller_squared_error = 1e-4 * ((u_nominal - u_learned)**2).sum(dim=-1)
+    controller_squared_error = 1e-8 * ((u_nominal - u_learned)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:

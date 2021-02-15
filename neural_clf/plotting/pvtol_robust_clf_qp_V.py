@@ -42,7 +42,7 @@ clf_net = CLF_QP_Net(n_dims,
 clf_net.load_state_dict(checkpoint['clf_net'])
 
 with torch.no_grad():
-    n_grid = 50
+    n_grid = 100
     x = torch.linspace(-4, 4, n_grid)
     z = torch.linspace(-4, 4, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
