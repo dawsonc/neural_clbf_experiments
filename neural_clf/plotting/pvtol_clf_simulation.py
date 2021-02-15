@@ -162,10 +162,10 @@ with torch.no_grad():
     ax2.legend()
 
     ax4 = axs[1, 0]
-    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR $u1$")
-    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle=":", label="LQR $u2$")
-    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="CLF $u1$")
-    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle=":", label="CLF $u2$")
+    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR $u_1$")
+    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle=":", label="LQR $u_2$")
+    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="CLF $u_1$")
+    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle=":", label="CLF $u_2$")
     ax4.plot()
     ax4.plot(t[:t_final_rclfqp], u_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1], linestyle="-")
