@@ -11,6 +11,7 @@ from neural_clf.controllers.lf_net_f16_gcas import (
 )
 from models.f16_full_gcas import (
     dynamics,
+    control_affine_dynamics,
     u_nominal,
     n_controls,
     n_dims,
@@ -107,8 +108,9 @@ safe_level = 1.0
 timestep = 0.001
 n_hidden = 64
 learning_rate = 0.001
-epochs = 1000
+epochs = 500
 batch_size = 64
+controller_penalty = 1e-3  # coefficient for loss for matching nominal controller
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -129,7 +131,7 @@ def adjust_relaxation_penalty(lf_net, epoch):
 # filename = "logs/f16_lf_gcas.pth.tar"
 # checkpoint = torch.load(filename)
 lf_net = LF_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
-                dynamics, u_nominal)
+                dynamics, control_affine_dynamics, u_nominal)
 # lf_net.load_state_dict(checkpoint['lf_net'])
 
 # Initialize the optimizer
@@ -145,6 +147,8 @@ for epoch in range(epochs):
     adjust_learning_rate(optimizer, epoch)
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(lf_net, epoch)
+    # and gradually decrease the penalty for matching the nominal controller
+    controller_penalty *= 0.1 ** (epoch // 4)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
@@ -164,7 +168,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        loss += controller_loss(x, lf_net, print_loss=False)
+        loss += controller_loss(x, lf_net, controller_penalty, print_loss=False)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -188,7 +192,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=True)
-        loss += controller_loss(x_test, lf_net, print_loss=True)
+        loss += controller_loss(x_test, lf_net, controller_penalty, print_loss=True)
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 
         # Save the model if it's the best yet
@@ -197,6 +201,7 @@ for epoch in range(epochs):
             filename = 'logs/f16_lf_gcas.pth.tar'
             torch.save({'n_hidden': n_hidden,
                         'relaxation_penalty': relaxation_penalty,
+                        'controller_penalty': controller_penalty,
                         'safe_level': safe_level,
                         'clf_lambda': clf_lambda,
                         'lf_net': lf_net.state_dict()}, filename)

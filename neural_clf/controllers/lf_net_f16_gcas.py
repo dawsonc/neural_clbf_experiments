@@ -13,7 +13,7 @@ class LF_Net(nn.Module):
     """
 
     def __init__(self, n_input, n_hidden, n_controls, clf_lambda, clf_relaxation_penalty,
-                 dynamics, u_nominal):
+                 dynamics, control_affine_dynamics, u_nominal):
         """
         Initialize the network
 
@@ -25,6 +25,11 @@ class LF_Net(nn.Module):
             clf_relaxation_penalty: the penalty for relaxing the control lyapunov constraint
             dynamics: a function that takes n_batch x n_dims state and n_batch x n_controls controls
                       and returns the state derivatives
+            control_affine_dynamics: a function that takes n_batch x n_dims and returns a tuple of:
+                f_func: a function n_batch x n_dims -> n_batch x n_dims that returns the
+                        state-dependent part of the control-affine dynamics
+                g_func: a function n_batch x n_dims -> n_batch x n_dims x n_controls that returns
+                        the input coefficient matrix for the control-affine dynamics
             u_nominal: a function n_batch x n_dims -> n_batch x n_controls that returns the nominal
                        control input for the system (even LQR about origin is fine)
         """
@@ -32,6 +37,7 @@ class LF_Net(nn.Module):
 
         # Save the dynamics and nominal controller functions
         self.dynamics = dynamics
+        self.control_affine_dynamics = control_affine_dynamics
         self.u_nominal = u_nominal
 
         # The network will have the following architecture
@@ -114,12 +120,13 @@ class LF_Net(nn.Module):
         u_learned = self.compute_controls(x)
 
         # Compute lie derivative
-        f = self.dynamics(x, u_learned)
-        L_f_V = torch.bmm(grad_V, f.unsqueeze(-1)).squeeze(-1)
+        f, g = self.control_affine_dynamics(x)
+        L_f_V = torch.bmm(grad_V, f.unsqueeze(-1))
+        L_g_V = torch.bmm(grad_V, g)
 
+        # Get the derivative of the Lyapunov function from the Lie derivatives and control input
         u = u_learned
-
-        Vdot = L_f_V.unsqueeze(-1)
+        Vdot = L_f_V + torch.bmm(L_g_V, u.unsqueeze(-1))
 
         return u, V, Vdot
 
@@ -155,7 +162,8 @@ def lyapunov_loss(x,
     #   2.) A term to encourage satisfaction of CLF condition
     u, V, _ = net(x)
     # To compute the change in V, simulate x forward in time and check if V decreases
-    xdot = net.dynamics(x, u)
+    f, g = net.control_affine_dynamics(x)
+    xdot = f + torch.bmm(g, u.unsqueeze(-1)).squeeze()
     x_next = x + timestep * xdot
     V_next, _ = net.compute_lyapunov(x_next)
     Vdot = (V_next.squeeze() - V.squeeze()) / timestep
@@ -165,14 +173,14 @@ def lyapunov_loss(x,
 
     #   3.) term to encourage V <= safe_level in the safe region
     safe_mask = x[:, 11] >= 100
-    V_safe, _ = net.compute_lyapunov(x[safe_mask[:, 0], :])
+    V_safe, _ = net.compute_lyapunov(x[safe_mask])
     safe_region_lyapunov_term = F.relu(V_safe - safe_level)
     if safe_region_lyapunov_term.numel() > 0:
         loss += safe_region_lyapunov_term.mean()
 
     #   4.) term to encourage V >= safe_level in the unsafe region
     unsafe_mask = x[:, 11] <= 0
-    V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask[:, 0], :])
+    V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask])
     unsafe_region_lyapunov_term = F.relu(safe_level - V_unsafe)
     if unsafe_region_lyapunov_term.numel() > 0:
         loss += unsafe_region_lyapunov_term.mean()
@@ -186,7 +194,7 @@ def lyapunov_loss(x,
     return loss
 
 
-def controller_loss(x, net, print_loss=False):
+def controller_loss(x, net, loss_coeff=1e-4, print_loss=False):
     """
     Compute a loss to train the filtered controller
 
@@ -197,12 +205,11 @@ def controller_loss(x, net, print_loss=False):
     returns:
         loss: the loss for the given controller function
     """
-    Nz_nominal, _, _, throttle_nominal = net.u_nominal(x)
-    u_nominal = torch.hstack((Nz_nominal.unsqueeze(-1), throttle_nominal.unsqueeze(-1)))
+    u_nominal = net.u_nominal(x)
     u_learned, _, _ = net(x)
 
     # Compute loss based on difference from nominal controller (e.g. LQR) at all points
-    controller_squared_error = 1e-3 * ((u_nominal - u_learned)**2).sum(dim=-1)
+    controller_squared_error = loss_coeff * ((u_nominal - u_learned)**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:
