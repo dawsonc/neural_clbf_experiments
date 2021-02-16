@@ -48,7 +48,7 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 100000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -92,8 +92,8 @@ for i in range(n_dims):
 
 # Also define the safe and unsafe regions
 # Remember that z is positive pointing downwards
-safe_z = 0.1
-unsafe_z = 0.5
+safe_z = 0.2
+unsafe_z = 0.6
 safe_xyz_radius = 7
 unsafe_xyz_radius = 7.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
@@ -134,10 +134,10 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # Instantiate the network
 filename = "logs/quad9d_robust_clf_qp.pth.tar"
-# checkpoint = torch.load(filename)
+checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
@@ -180,7 +180,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        loss += controller_loss(x, clf_net, print_loss=False, use_nominal=True)
+        loss += controller_loss(x, clf_net, print_loss=False, use_nominal=True, loss_coeff=1e-6)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -206,7 +206,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=True)
-        loss += controller_loss(x_test, clf_net, print_loss=True, use_nominal=True)
+        loss += controller_loss(x_test, clf_net, print_loss=True, use_nominal=True, loss_coeff=1e-6)
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 
         # Save the model if it's the best yet
