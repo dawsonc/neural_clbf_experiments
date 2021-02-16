@@ -15,6 +15,7 @@ from models.quad9d import (
     n_controls,
     n_dims,
     g,
+    StateIndex,
 )
 
 
@@ -49,7 +50,8 @@ for i in range(n_dims):
     x_test[:, i] = x_test[:, i] * (max_val - min_val) + min_val
 
 # Create a tensor for the origin as well, which is our goal
-x0 = torch.zeros(1, 6)
+x0 = torch.zeros(1, n_dims)
+x0[0, StateIndex.F] = g
 
 # Also define the safe and unsafe regions
 safe_z = -0.1
@@ -94,10 +96,10 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # Instantiate the network
 filename = "logs/quad9d_robust_clf_qp.pth.tar"
-checkpoint = torch.load(filename)
+# checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-clf_net.load_state_dict(checkpoint['clf_net'])
+# clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
