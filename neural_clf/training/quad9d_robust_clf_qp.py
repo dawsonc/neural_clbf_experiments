@@ -23,9 +23,9 @@ torch.set_default_dtype(torch.float64)
 
 # Define operational domain through min/max tuples
 domain = [
-    (-5, 5),                  # x
-    (-5, 5),                  # y
-    (-5, 5),                  # z
+    (-8, 8),                  # x
+    (-8, 8),                  # y
+    (-8, 8),                  # z
     (-1.5, 1.5),              # vx
     (-1.5, 1.5),              # vy
     (-1.5, 1.5),              # vz
@@ -72,11 +72,11 @@ for i in range(n_dims):
 x_test = torch.vstack((x_test, x_test_near_origin))
 
 # Sample some goal states as well
-N_goal = 100
+N_goal = 1
 goal_domain = [
-    (-0.05, 0.05),             # x
-    (-0.05, 0.05),             # y
-    (-0.05, 0.05),             # z
+    (0.0, 0.0),             # x
+    (0.0, 0.0),             # y
+    (0.0, 0.0),             # z
     (0.0, 0.0),              # vx
     (0.0, 0.0),              # vy
     (0.0, 0.0),              # vz
@@ -93,8 +93,8 @@ for i in range(n_dims):
 # Also define the safe and unsafe regions
 safe_z = -0.1
 unsafe_z = -0.5
-safe_xyz_radius = 30
-unsafe_xyz_radius = 35
+safe_xyz_radius = 7
+unsafe_xyz_radius = 7.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] >= safe_z,
                                    x_test[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] <= unsafe_z,

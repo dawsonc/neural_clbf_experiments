@@ -36,8 +36,8 @@ clf_net.load_state_dict(checkpoint['clf_net'])
 
 with torch.no_grad():
     n_grid = 50
-    x = torch.linspace(-5, 5, n_grid)
-    z = torch.linspace(-5, 5, n_grid)
+    x = torch.linspace(-8, 8, n_grid)
+    z = torch.linspace(-8, 8, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
     residuals = torch.zeros(n_grid, n_grid)
     V_values = torch.zeros(n_grid, n_grid)
@@ -63,6 +63,10 @@ with torch.no_grad():
                 c="g", label="Safe")
     axs[0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]],
                 c="r", label="Unsafe")
+    safe_circle = plt.Circle((0.0, 0.0), checkpoint["safe_xyz_radius"], color='g', fill=False)
+    unsafe_circle = plt.Circle((0.0, 0.0), checkpoint["unsafe_xyz_radius"], color='r', fill=False)
+    axs[0].add_patch(safe_circle)
+    axs[0].add_patch(unsafe_circle)
     axs[0].set_xlabel('$x$')
     axs[0].set_ylabel('$z$')
     axs[0].set_title('$V$')
