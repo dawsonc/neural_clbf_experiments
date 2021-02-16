@@ -23,16 +23,16 @@ torch.set_default_dtype(torch.float64)
 
 # Define operational domain through min/max tuples
 domain = [
-    (-8, 8),                  # x
-    (-8, 8),                  # y
-    (-8, 8),                  # z
+    (-4, 4),                  # x
+    (-4, 4),                  # y
+    (-4, 4),                  # z
     (-1.5, 1.5),              # vx
     (-1.5, 1.5),              # vy
     (-1.5, 1.5),              # vz
     (-0.5 * g, 2 * g),        # f
-    (-np.pi / 3, np.pi / 3),  # roll
-    (-np.pi / 3, np.pi / 3),  # pitch
-    (-np.pi / 3, np.pi / 3),  # yaw
+    (-np.pi, np.pi),  # roll
+    (-np.pi, np.pi),  # pitch
+    (-np.pi, np.pi),  # yaw
 ]
 domain_near_origin = [
     (-0.5, 0.5),                # x
@@ -42,13 +42,13 @@ domain_near_origin = [
     (-1.5, 1.5),              # vy
     (-1.5, 1.5),              # vz
     (-0.5 * g, 2 * g),        # f
-    (-np.pi / 3, np.pi / 3),  # roll
-    (-np.pi / 3, np.pi / 3),  # pitch
-    (-np.pi / 3, np.pi / 3),  # yaw
+    (-np.pi, np.pi),  # roll
+    (-np.pi, np.pi),  # pitch
+    (-np.pi, np.pi),  # yaw
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 10000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -60,7 +60,7 @@ for i in range(n_dims):
 x_train = torch.vstack((x_train, x_train_near_origin))
 
 # Also get some testing data
-N_test = 5000
+N_test = 100000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -116,12 +116,12 @@ n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
-controller_loss_coeff = 1e-4
+init_controller_loss_coeff = 1e-4
 
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 10))
+    lr = learning_rate * (0.1 ** (epoch // 5))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -131,6 +131,12 @@ def adjust_learning_rate(optimizer, epoch):
 def adjust_relaxation_penalty(clf_net, epoch):
     penalty = relaxation_penalty * (2 ** (epoch // 2))
     clf_net.relaxation_penalty = penalty
+
+
+# We penalize deviation from the nominal controller more heavily to start, then gradually relax
+def adjust_controller_penalty(epoch):
+    penalty = init_controller_loss_coeff * (0.5 ** (epoch // 1))
+    return penalty
 
 
 # Instantiate the network
@@ -155,7 +161,7 @@ for epoch in range(epochs):
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(clf_net, epoch)
     # And reduce the reliance on the nominal controller loss
-    controller_loss_coeff *= 0.7
+    controller_loss_coeff = adjust_controller_penalty(epoch)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
