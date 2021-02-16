@@ -114,7 +114,9 @@ def u_nominal(x, **kwargs):
     K = torch.tensor(lqr(A, B, Q, R), dtype=x.dtype)
 
     # Compute nominal control from feedback + equilibrium control
-    u_nominal = -(K @ x.T).T
+    x_eq = torch.zeros_like(x)
+    x_eq[:, StateIndex.F] = g
+    u_nominal = -(K @ (x - x_eq).T).T
     u_eq = torch.zeros_like(u_nominal)
 
     return u_nominal + u_eq

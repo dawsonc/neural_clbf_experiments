@@ -33,6 +33,7 @@ clf_net = CLF_QP_Net(n_dims,
                      scenarios,
                      nominal_scenario)
 clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.use_QP = False
 
 with torch.no_grad():
     n_grid = 50
