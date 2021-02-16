@@ -270,13 +270,13 @@ def lyapunov_loss(x,
     #   3.) term to encourage V <= safe_level in the safe region
     V_safe, _ = net.compute_lyapunov(x[safe_mask])
     safe_region_lyapunov_term = F.relu(V_safe - safe_level)
-    if safe_region_lyapunov_term.nelements() > 0:
+    if safe_region_lyapunov_term.nelement() > 0:
         loss += safe_region_lyapunov_term.mean()
 
     #   4.) term to encourage V >= safe_level in the unsafe region
     V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask])
     unsafe_region_lyapunov_term = F.relu(safe_level - V_unsafe)
-    if unsafe_region_lyapunov_term.nelements() > 0:
+    if unsafe_region_lyapunov_term.nelement() > 0:
         loss += unsafe_region_lyapunov_term.mean()
 
     #   5.) A term to encourage satisfaction of CLF condition

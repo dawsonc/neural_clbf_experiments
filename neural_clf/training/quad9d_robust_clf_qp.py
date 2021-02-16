@@ -56,12 +56,12 @@ x0[0, StateIndex.F] = g
 # Also define the safe and unsafe regions
 safe_z = -0.1
 unsafe_z = -0.5
-safe_xyz_radius = 20
-unsafe_xyz_radius = 20
-safe_mask_test = torch.logical_and(x_test[:, 1] >= safe_z,
-                                   x_test[:, :3].norm(dim=-1) <= safe_xyz_radius)
-unsafe_mask_test = torch.logical_or(x_test[:, 1] <= unsafe_z,
-                                    x_test[:, :3].norm(dim=-1) >= unsafe_xyz_radius)
+safe_xyz_radius = 27
+unsafe_xyz_radius = 29
+safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] >= safe_z,
+                                   x_test[:, :StateIndex.PZ].norm(dim=-1) <= safe_xyz_radius)
+unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] <= unsafe_z,
+                                    x_test[:, :StateIndex.PZ].norm(dim=-1) >= unsafe_xyz_radius)
 
 # Define the scenarios
 nominal_scenario = {}
@@ -78,7 +78,6 @@ n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
-
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
