@@ -132,7 +132,7 @@ filename = "logs/f16_lf_gcas.pth.tar"
 checkpoint = torch.load(filename)
 lf_net = LF_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                 dynamics, control_affine_dynamics, u_nominal)
-lf_net.load_state_dict(checkpoint['lf_net'])
+# lf_net.load_state_dict(checkpoint['lf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(lf_net.parameters(), lr=learning_rate)
@@ -148,7 +148,7 @@ for epoch in range(epochs):
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(lf_net, epoch)
     # and gradually decrease the penalty for matching the nominal controller
-    controller_penalty *= 0.01 ** (epoch // 4)
+    controller_penalty *= 0.1 ** (epoch // 4)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
