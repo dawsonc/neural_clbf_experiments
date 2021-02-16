@@ -94,8 +94,8 @@ for i in range(n_dims):
 # Remember that z is positive pointing downwards
 safe_z = 0.2
 unsafe_z = 0.6
-safe_xyz_radius = 7
-unsafe_xyz_radius = 7.5
+safe_xyz_radius = 3
+unsafe_xyz_radius = 3.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
                                    x_test[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
