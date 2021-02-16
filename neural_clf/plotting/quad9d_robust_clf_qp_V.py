@@ -49,7 +49,7 @@ with torch.no_grad():
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
             q[0, 0] = x[i]
-            q[0, 2] = -z[j]
+            q[0, 2] = z[j]
             _, r, V, V_dot = clf_net(q)
             residuals[j, i] = r
             V_values[j, i] = V

@@ -91,6 +91,7 @@ for i in range(n_dims):
     x0[:, i] = x0[:, i] * (max_val - min_val) + min_val
 
 # Also define the safe and unsafe regions
+# Remember that z is positive pointing downwards
 safe_z = 0.1
 unsafe_z = 0.5
 safe_xyz_radius = 7
