@@ -38,13 +38,13 @@ domain_near_origin = [
     (-0.5, 0.5),                # x
     (-0.5, 0.5),                # y
     (-0.5, 0.5),                # z
-    (-8, 8),              # vx
-    (-8, 8),              # vy
-    (-8, 8),              # vz
-    (-0.5 * g, 2 * g),        # f
-    (-np.pi, np.pi),  # roll
-    (-np.pi, np.pi),  # pitch
-    (-np.pi, np.pi),  # yaw
+    (-0.5, 0.5),              # vx
+    (-0.5, 0.5),              # vy
+    (-0.5, 0.5),              # vz
+    (-0.8 * g, 1.5 * g),        # f
+    (-np.pi / 3, np.pi / 3),  # roll
+    (-np.pi / 3, np.pi / 3),  # pitch
+    (-np.pi / 3, np.pi / 3),  # yaw
 ]
 
 # First, sample training data uniformly from the state space
