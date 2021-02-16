@@ -56,8 +56,8 @@ x0[0, StateIndex.F] = g
 # Also define the safe and unsafe regions
 safe_z = -0.1
 unsafe_z = -0.5
-safe_xyz_radius = 27
-unsafe_xyz_radius = 29
+safe_xyz_radius = 30
+unsafe_xyz_radius = 35
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] >= safe_z,
                                    x_test[:, :StateIndex.PZ].norm(dim=-1) <= safe_xyz_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] <= unsafe_z,
