@@ -121,7 +121,7 @@ controller_loss_coeff = 1e-4
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 2))
+    lr = learning_rate * (0.1 ** (epoch // 10))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -155,7 +155,7 @@ for epoch in range(epochs):
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(clf_net, epoch)
     # And reduce the reliance on the nominal controller loss
-    controller_loss_coeff *= 0.9
+    controller_loss_coeff *= 0.7
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
