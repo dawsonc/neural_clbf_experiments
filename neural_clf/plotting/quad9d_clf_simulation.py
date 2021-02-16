@@ -164,11 +164,11 @@ with torch.no_grad():
     ax1.plot([], c=sns.color_palette("pastel")[1], label="rCLF")
     ax1.plot([], c=sns.color_palette("pastel")[2], label="CLF")
     ax1.plot([], c=sns.color_palette("pastel")[0], label="LQR")
-    ax1.plot(t[:t_final_rclfqp], -x_sim_rclfqp[:t_final_rclfqp, :, StateIndex.PZ],
+    ax1.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, StateIndex.PZ],
              c=sns.color_palette("pastel")[1])
-    ax1.plot(t[:t_final_nclfqp], -x_sim_nclfqp[:t_final_nclfqp, :, StateIndex.PZ],
+    ax1.plot(t[:t_final_nclfqp], x_sim_nclfqp[:t_final_nclfqp, :, StateIndex.PZ],
              c=sns.color_palette("pastel")[2])
-    ax1.plot(t, -x_sim_lqr[:, :, StateIndex.PZ], c=sns.color_palette("pastel")[0])
+    ax1.plot(t, x_sim_lqr[:, :, StateIndex.PZ], c=sns.color_palette("pastel")[0])
     ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
     ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
 
