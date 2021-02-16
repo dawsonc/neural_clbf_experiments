@@ -81,9 +81,9 @@ unsafe_z = -0.5
 safe_xyz_radius = 30
 unsafe_xyz_radius = 35
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] >= safe_z,
-                                   x_test[:, :StateIndex.PZ].norm(dim=-1) <= safe_xyz_radius)
+                                   x_test[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] <= unsafe_z,
-                                    x_test[:, :StateIndex.PZ].norm(dim=-1) >= unsafe_xyz_radius)
+                                    x_test[:, :StateIndex.PZ + 1].norm(dim=-1) >= unsafe_xyz_radius)
 
 # Define the scenarios
 nominal_scenario = {}
@@ -144,10 +144,10 @@ for epoch in range(epochs):
         x = x_train[indices]
 
         # Segment into safe/unsafe
-        safe_mask = torch.logical_and(x[:, 1] >= safe_z,
-                                      x[:, :3].norm(dim=-1) <= safe_xyz_radius)
-        unsafe_mask = torch.logical_or(x[:, 1] <= unsafe_z,
-                                       x[:, :3].norm(dim=-1) >= unsafe_xyz_radius)
+        safe_mask = torch.logical_and(x[:, StateIndex.PZ] >= safe_z,
+                                      x[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
+        unsafe_mask = torch.logical_or(x[:, StateIndex.PZ] <= unsafe_z,
+                                       x[:, :StateIndex.PZ + 1].norm(dim=-1) >= unsafe_xyz_radius)
 
         # Zero parameter gradients before training
         optimizer.zero_grad()
