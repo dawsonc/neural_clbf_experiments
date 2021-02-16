@@ -68,8 +68,8 @@ robust_clf_net.use_QP = False
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, StateIndex.PZ] = 1.0
-    x_sim_start[:, StateIndex.VZ] = -2.0
+    x_sim_start[:, StateIndex.PZ] = -1.0
+    x_sim_start[:, StateIndex.VZ] = 2.0
 
     t_sim = 10
     delta_t = 0.001
@@ -82,26 +82,26 @@ with torch.no_grad():
     Vdot_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     x_sim_rclfqp[0, :, :] = x_sim_start
     t_final_rclfqp = 0
-    # try:
-    #     for tstep in tqdm(range(1, num_timesteps)):
-    #         # Get the current state
-    #         x_current = x_sim_rclfqp[tstep - 1, :, :]
-    #         # Get the control input at the current state
-    #         u, r, V, Vdot = robust_clf_net(x_current)
+    try:
+        for tstep in tqdm(range(1, num_timesteps)):
+            # Get the current state
+            x_current = x_sim_rclfqp[tstep - 1, :, :]
+            # Get the control input at the current state
+            u, r, V, Vdot = robust_clf_net(x_current)
 
-    #         u_sim_rclfqp[tstep, :, :] = u
-    #         V_sim_rclfqp[tstep, :, 0] = V
-    #         Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
-    #         # Get the dynamics
-    #         for i in range(N_sim):
-    #             f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0))
-    #             # Take one step to the future
-    #             xdot = f_val + g_val @ u[i, :]
-    #             x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
+            u_sim_rclfqp[tstep, :, :] = u
+            V_sim_rclfqp[tstep, :, 0] = V
+            Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
+            # Get the dynamics
+            for i in range(N_sim):
+                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0))
+                # Take one step to the future
+                xdot = f_val + g_val @ u[i, :]
+                x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
-    #         t_final_rclfqp = tstep
-    # except (Exception, KeyboardInterrupt):
-    #     print("Controller failed")
+            t_final_rclfqp = tstep
+    except (Exception, KeyboardInterrupt):
+        print("Controller failed")
 
     print("Simulating non-robust CLF QP controller...")
     x_sim_nclfqp = torch.zeros(num_timesteps, N_sim, n_dims)
@@ -164,16 +164,16 @@ with torch.no_grad():
     ax1.plot([], c=sns.color_palette("pastel")[1], label="rCLF")
     ax1.plot([], c=sns.color_palette("pastel")[2], label="CLF")
     ax1.plot([], c=sns.color_palette("pastel")[0], label="LQR")
-    ax1.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, StateIndex.PZ],
+    ax1.plot(t[:t_final_rclfqp], -x_sim_rclfqp[:t_final_rclfqp, :, StateIndex.PZ],
              c=sns.color_palette("pastel")[1])
-    ax1.plot(t[:t_final_nclfqp], x_sim_nclfqp[:t_final_nclfqp, :, StateIndex.PZ],
+    ax1.plot(t[:t_final_nclfqp], -x_sim_nclfqp[:t_final_nclfqp, :, StateIndex.PZ],
              c=sns.color_palette("pastel")[2])
-    ax1.plot(t, x_sim_lqr[:, :, StateIndex.PZ], c=sns.color_palette("pastel")[0])
+    ax1.plot(t, -x_sim_lqr[:, :, StateIndex.PZ], c=sns.color_palette("pastel")[0])
     ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
     ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
 
     ax1.set_xlabel("$t$")
-    ax1.set_ylabel("$y$")
+    ax1.set_ylabel("$z$")
     ax1.legend()
     ax1.set_xlim([0, t_sim])
 

@@ -91,8 +91,8 @@ for i in range(n_dims):
     x0[:, i] = x0[:, i] * (max_val - min_val) + min_val
 
 # Also define the safe and unsafe regions
-safe_z = -0.1
-unsafe_z = -0.5
+safe_z = 0.1
+unsafe_z = 0.5
 safe_xyz_radius = 7
 unsafe_xyz_radius = 7.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] >= safe_z,

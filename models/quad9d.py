@@ -89,31 +89,33 @@ def control_affine_dynamics(x, **kwargs):
     return f_func(x), g_func(x)
 
 
+# Linearize the system about the x = 0 (except f = g), u = 0
+A = np.zeros((n_dims, n_dims))
+A[StateIndex.PX, StateIndex.VX] = 1.0
+A[StateIndex.PY, StateIndex.VY] = 1.0
+A[StateIndex.PZ, StateIndex.VZ] = 1.0
+
+A[StateIndex.VX, StateIndex.THETA] = -g
+A[StateIndex.VY, StateIndex.PHI] = g
+A[StateIndex.VZ, StateIndex.F] = -1
+
+B = np.zeros((n_dims, n_controls))
+B[StateIndex.F:, :] = torch.eye(n_controls)
+
+# Define cost matrices as identity
+Q = np.eye(n_dims)
+R = np.eye(n_controls)
+
+# Get feedback matrix
+K_np = lqr(A, B, Q, R)
+
+
 def u_nominal(x, **kwargs):
     """
     Return the nominal controller for the system at state x, given by LQR
     """
-    # Linearize the system about the x = 0 (except f = g), u = 0
-    A = np.zeros((n_dims, n_dims))
-    A[StateIndex.PX, StateIndex.VX] = 1.0
-    A[StateIndex.PY, StateIndex.VY] = 1.0
-    A[StateIndex.PZ, StateIndex.VZ] = 1.0
-
-    A[StateIndex.VX, StateIndex.THETA] = -g
-    A[StateIndex.VY, StateIndex.PHI] = g
-    A[StateIndex.VZ, StateIndex.F] = -1
-
-    B = np.zeros((n_dims, n_controls))
-    B[StateIndex.F:, :] = torch.eye(n_controls)
-
-    # Define cost matrices as identity
-    Q = np.eye(n_dims)
-    R = np.eye(n_controls)
-
-    # Get feedback matrix
-    K = torch.tensor(lqr(A, B, Q, R), dtype=x.dtype)
-
     # Compute nominal control from feedback + equilibrium control
+    K = torch.tensor(K_np, dtype=x.dtype)
     x_eq = torch.zeros_like(x)
     x_eq[:, StateIndex.F] = g
     u_nominal = -(K @ (x - x_eq).T).T
