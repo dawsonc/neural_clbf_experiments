@@ -26,9 +26,9 @@ domain = [
     (-4, 4),                  # x
     (-4, 4),                  # y
     (-4, 4),                  # z
-    (-1.5, 1.5),              # vx
-    (-1.5, 1.5),              # vy
-    (-1.5, 1.5),              # vz
+    (-8, 8),              # vx
+    (-8, 8),              # vy
+    (-8, 8),              # vz
     (-0.5 * g, 2 * g),        # f
     (-np.pi, np.pi),  # roll
     (-np.pi, np.pi),  # pitch
@@ -38,9 +38,9 @@ domain_near_origin = [
     (-0.5, 0.5),                # x
     (-0.5, 0.5),                # y
     (-0.5, 0.5),                # z
-    (-1.5, 1.5),              # vx
-    (-1.5, 1.5),              # vy
-    (-1.5, 1.5),              # vz
+    (-8, 8),              # vx
+    (-8, 8),              # vy
+    (-8, 8),              # vz
     (-0.5 * g, 2 * g),        # f
     (-np.pi, np.pi),  # roll
     (-np.pi, np.pi),  # pitch
@@ -83,7 +83,7 @@ goal_domain = [
     (g, g),                  # f
     (0.0, 0.0),  # roll
     (0.0, 0.0),  # pitch
-    (np.pi/10, np.pi/10),  # yaw
+    (0.0, 0.0),  # yaw
 ]
 x0 = torch.Tensor(N_goal, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
