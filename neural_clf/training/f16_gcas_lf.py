@@ -128,11 +128,11 @@ def adjust_relaxation_penalty(lf_net, epoch):
 
 
 # Instantiate the network
-# filename = "logs/f16_lf_gcas.pth.tar"
-# checkpoint = torch.load(filename)
+filename = "logs/f16_lf_gcas.pth.tar"
+checkpoint = torch.load(filename)
 lf_net = LF_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                 dynamics, control_affine_dynamics, u_nominal)
-# lf_net.load_state_dict(checkpoint['lf_net'])
+lf_net.load_state_dict(checkpoint['lf_net'])
 
 # Initialize the optimizer
 optimizer = optim.Adam(lf_net.parameters(), lr=learning_rate)
@@ -161,6 +161,7 @@ for epoch in range(epochs):
 
         # Compute loss
         loss = 0.0
+        loss += controller_loss(x, lf_net, controller_penalty, print_loss=False)
         loss += lyapunov_loss(x,
                               x_goal,
                               lf_net,
@@ -168,7 +169,6 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        loss += controller_loss(x, lf_net, controller_penalty, print_loss=False)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -185,6 +185,7 @@ for epoch in range(epochs):
     with torch.no_grad():
         # Compute loss
         loss = 0.0
+        loss += controller_loss(x_test, lf_net, controller_penalty, print_loss=True)
         loss += lyapunov_loss(x_test,
                               x_goal,
                               lf_net,
@@ -192,7 +193,6 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=True)
-        loss += controller_loss(x_test, lf_net, controller_penalty, print_loss=True)
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 
         # Save the model if it's the best yet

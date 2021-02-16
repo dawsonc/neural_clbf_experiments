@@ -101,8 +101,10 @@ with torch.no_grad():
             x_current = x_sim_nominal[tstep - 1, :, :]
             # Get the control input at the current state
             u = u_nominal(x_current)
+            Nz_nominal_nominal[tstep, :, 0] = u[:, 0]
             # and measure the Lyapunov function value here
-            # V, _ = clf_net.compute_lyapunov(x_current)
+            V, _ = clf_net.compute_lyapunov(x_current)
+            V_sim_nominal[tstep, :, 0] = V
 
             u_sim_nominal[tstep, :, :] = u
             # V_sim_nominal[tstep, :, 0] = V
@@ -131,8 +133,8 @@ with torch.no_grad():
     ax1.set_xlim([0, t_sim])
 
     ax2 = axs[0, 1]
-    ax2.plot([], c=sns.color_palette("pastel")[0], label="Nominal V")
-    ax2.plot([], c=sns.color_palette("pastel")[1], label="LF V")
+    ax2.plot([], c=sns.color_palette("pastel")[0], label="Nominal")
+    ax2.plot([], c=sns.color_palette("pastel")[1], label="LF")
     ax2.plot(t[:t_final_nominal], V_sim_nominal[:t_final_nominal, :, 0], c=sns.color_palette("pastel")[0])
     ax2.plot(t[:t_final_rclfqp], V_sim_rclfqp[:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
@@ -143,21 +145,21 @@ with torch.no_grad():
     ax2.set_xlim([0, t_sim])
 
     ax3 = axs[1, 0]
-    ax3.plot([], c=sns.color_palette("pastel")[0], label="Nominal Nz")
-    ax3.plot([], c=sns.color_palette("pastel")[1], label="LF Nz")
+    ax3.plot([], c=sns.color_palette("pastel")[0], label="Nominal")
+    ax3.plot([], c=sns.color_palette("pastel")[1], label="LF")
     ax3.plot()
-    ax3.plot(t[:t_final_rclfqp], Nz_sim_rclfqp[:t_final_rclfqp, :, 0],
+    ax3.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, StateIndex.THETA],
              c=sns.color_palette("pastel")[1])
-    ax3.plot(t[:t_final_nominal], Nz_sim_nominal[:t_final_nominal, :, 0],
+    ax3.plot(t[:t_final_nominal], x_sim_nominal[:t_final_nominal, :, StateIndex.THETA],
              c=sns.color_palette("pastel")[0])
     ax3.set_xlabel("$t$")
-    ax3.set_ylabel("$Nz$")
+    ax3.set_ylabel("$\\theta$")
     ax3.legend()
     ax3.set_xlim([0, t_sim])
 
     ax4 = axs[1, 1]
-    ax4.plot([], c=sns.color_palette("pastel")[0], label="Nominal Nz demanded")
-    ax4.plot([], c=sns.color_palette("pastel")[1], label="LF Nz demanded")
+    ax4.plot([], c=sns.color_palette("pastel")[0], label="Nominal")
+    ax4.plot([], c=sns.color_palette("pastel")[1], label="LF")
     ax4.plot(t[:t_final_nominal], Nz_nominal_nominal[:t_final_nominal, :, 0],
              c=sns.color_palette("pastel")[0])
     ax4.plot(t[:t_final_rclfqp], Nz_nominal_rclfqp[:t_final_rclfqp, :, 0],
