@@ -23,9 +23,21 @@ torch.set_default_dtype(torch.float64)
 
 # Define operational domain through min/max tuples
 domain = [
-    (-30, 30),                # x
-    (-30, 30),                # y
-    (-30, 30),                # z
+    (-5, 5),                  # x
+    (-5, 5),                  # y
+    (-5, 5),                  # z
+    (-1.5, 1.5),              # vx
+    (-1.5, 1.5),              # vy
+    (-1.5, 1.5),              # vz
+    (-0.5 * g, 2 * g),        # f
+    (-np.pi / 3, np.pi / 3),  # roll
+    (-np.pi / 3, np.pi / 3),  # pitch
+    (-np.pi / 3, np.pi / 3),  # yaw
+]
+domain_near_origin = [
+    (-0.5, 0.5),                # x
+    (-0.5, 0.5),                # y
+    (-0.5, 0.5),                # z
     (-1.5, 1.5),              # vx
     (-1.5, 1.5),              # vy
     (-1.5, 1.5),              # vz
@@ -41,13 +53,23 @@ x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_train[:, i] = x_train[:, i] * (max_val - min_val) + min_val
+x_train_near_origin = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
+for i in range(n_dims):
+    min_val, max_val = domain_near_origin[i]
+    x_train_near_origin[:, i] = x_train_near_origin[:, i] * (max_val - min_val) + min_val
+x_train = torch.vstack((x_train, x_train_near_origin))
 
-# Also get some testing data, just to be principled
+# Also get some testing data
 N_test = 10000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_test[:, i] = x_test[:, i] * (max_val - min_val) + min_val
+x_test_near_origin = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
+for i in range(n_dims):
+    min_val, max_val = domain_near_origin[i]
+    x_test_near_origin[:, i] = x_test_near_origin[:, i] * (max_val - min_val) + min_val
+x_test = torch.vstack((x_test, x_test_near_origin))
 
 # Create a tensor for the origin as well, which is our goal
 x0 = torch.zeros(1, n_dims)
