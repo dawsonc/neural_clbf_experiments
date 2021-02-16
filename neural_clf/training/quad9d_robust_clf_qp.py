@@ -71,9 +71,24 @@ for i in range(n_dims):
     x_test_near_origin[:, i] = x_test_near_origin[:, i] * (max_val - min_val) + min_val
 x_test = torch.vstack((x_test, x_test_near_origin))
 
-# Create a tensor for the origin as well, which is our goal
-x0 = torch.zeros(1, n_dims)
-x0[0, StateIndex.F] = g
+# Sample some goal states as well
+N_goal = 100
+goal_domain = [
+    (-0.05, 0.05),             # x
+    (-0.05, 0.05),             # y
+    (-0.05, 0.05),             # z
+    (0.0, 0.0),              # vx
+    (0.0, 0.0),              # vy
+    (0.0, 0.0),              # vz
+    (g, g),                  # f
+    (0.0, 0.0),  # roll
+    (0.0, 0.0),  # pitch
+    (np.pi/10, np.pi/10),  # yaw
+]
+x0 = torch.Tensor(N_goal, n_dims).uniform_(0.0, 1.0)
+for i in range(n_dims):
+    min_val, max_val = domain[i]
+    x0[:, i] = x0[:, i] * (max_val - min_val) + min_val
 
 # Also define the safe and unsafe regions
 safe_z = -0.1
@@ -101,9 +116,10 @@ learning_rate = 0.001
 epochs = 1000
 batch_size = 64
 
+
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 4))
+    lr = learning_rate * (0.1 ** (epoch // 2))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 

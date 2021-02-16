@@ -265,7 +265,8 @@ def lyapunov_loss(x,
     loss = 0.0
     #   1.) squared value of the Lyapunov function at the goal
     V0, _ = net.compute_lyapunov(x_goal)
-    loss += V0.pow(2).squeeze()
+    goal_term = F.relu(V0)
+    loss += goal_term.mean()
 
     #   3.) term to encourage V <= safe_level in the safe region
     V_safe, _ = net.compute_lyapunov(x[safe_mask])
@@ -297,7 +298,7 @@ def lyapunov_loss(x,
     loss += r.mean()
 
     if print_loss:
-        print(f"                     CLF origin: {V0.pow(2).squeeze().item()}")
+        print(f"                     CLF origin: {goal_term.mean().item()}")
         print(f"           CLF safe region term: {safe_region_lyapunov_term.mean().item()}")
         print(f"         CLF unsafe region term: {unsafe_region_lyapunov_term.mean().item()}")
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
@@ -306,7 +307,7 @@ def lyapunov_loss(x,
     return loss
 
 
-def controller_loss(x, net, print_loss=False, use_nominal=False):
+def controller_loss(x, net, print_loss=False, use_nominal=False, loss_coeff=1e-8):
     """
     Compute a loss to train the filtered controller
 
@@ -323,9 +324,9 @@ def controller_loss(x, net, print_loss=False, use_nominal=False):
     if use_nominal:
         # Compute loss based on difference from nominal controller (e.g. LQR).
         u_nominal = net.u_nominal(x, **net.nominal_scenario)
-        controller_squared_error = 1e-8 * ((u_nominal - u_learned)**2).sum(dim=-1)
+        controller_squared_error = loss_coeff * ((u_nominal - u_learned)**2).sum(dim=-1)
     else:
-        controller_squared_error = 1e-8 * (u_learned**2).sum(dim=-1)
+        controller_squared_error = loss_coeff * (u_learned**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:
