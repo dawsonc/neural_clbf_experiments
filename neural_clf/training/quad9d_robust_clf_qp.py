@@ -60,7 +60,7 @@ for i in range(n_dims):
 x_train = torch.vstack((x_train, x_train_near_origin))
 
 # Also get some testing data
-N_test = 10000
+N_test = 5000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -116,6 +116,7 @@ n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
+controller_loss_coeff = 1e-4
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -153,6 +154,8 @@ for epoch in range(epochs):
     adjust_learning_rate(optimizer, epoch)
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(clf_net, epoch)
+    # And reduce the reliance on the nominal controller loss
+    controller_loss_coeff *= 0.9
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
@@ -180,7 +183,8 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        loss += controller_loss(x, clf_net, print_loss=False, use_nominal=True, loss_coeff=1e-6)
+        loss += controller_loss(x, clf_net, print_loss=False, use_nominal=True,
+                                loss_coeff=controller_loss_coeff)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -206,7 +210,8 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=True)
-        loss += controller_loss(x_test, clf_net, print_loss=True, use_nominal=True, loss_coeff=1e-6)
+        loss += controller_loss(x_test, clf_net, print_loss=True, use_nominal=True,
+                                loss_coeff=controller_loss_coeff)
         print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
 
         # Save the model if it's the best yet
