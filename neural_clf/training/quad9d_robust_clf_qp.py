@@ -48,7 +48,7 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 2000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -116,7 +116,7 @@ n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-4
+init_controller_loss_coeff = 1e-8
 
 
 def adjust_learning_rate(optimizer, epoch):
