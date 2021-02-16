@@ -96,9 +96,9 @@ safe_z = 0.1
 unsafe_z = 0.5
 safe_xyz_radius = 7
 unsafe_xyz_radius = 7.5
-safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] >= safe_z,
+safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
                                    x_test[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
-unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] <= unsafe_z,
+unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
                                     x_test[:, :StateIndex.PZ + 1].norm(dim=-1) >= unsafe_xyz_radius)
 
 # Define the scenarios
@@ -161,9 +161,9 @@ for epoch in range(epochs):
         x = x_train[indices]
 
         # Segment into safe/unsafe
-        safe_mask = torch.logical_and(x[:, StateIndex.PZ] >= safe_z,
+        safe_mask = torch.logical_and(x[:, StateIndex.PZ] <= safe_z,
                                       x[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
-        unsafe_mask = torch.logical_or(x[:, StateIndex.PZ] <= unsafe_z,
+        unsafe_mask = torch.logical_or(x[:, StateIndex.PZ] >= unsafe_z,
                                        x[:, :StateIndex.PZ + 1].norm(dim=-1) >= unsafe_xyz_radius)
 
         # Zero parameter gradients before training
