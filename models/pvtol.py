@@ -40,7 +40,7 @@ def f_func(x, m=low_m, inertia=low_I):
 
     x = [[x, z, theta, vx, vz, theta_dot]_1, ...]
     """
-    # x is batched, so has dimensions [n_batches, 2]. Compute x_dot for each bit
+    # x is batched, so has dimensions [n_batches, n_dims]. Compute x_dot for each bit
     f = torch.zeros_like(x)
 
     f[:, 0] = x[:, 3]

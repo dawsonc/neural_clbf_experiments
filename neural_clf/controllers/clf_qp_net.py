@@ -68,6 +68,9 @@ class CLF_QP_Net(nn.Module):
         self.G_u = G_u.double()
         self.h_u = h_u.double()
 
+        # Allow user to toggle QP on and off
+        self.use_QP = True
+
         # To find the control input, we want to solve a QP, so we need to define the QP layer here
         # The decision variables are the control input and relaxation of the CLF condition for each
         # scenario
@@ -205,16 +208,18 @@ class CLF_QP_Net(nn.Module):
             L_g_Vs.append(torch.bmm(grad_V, g).squeeze(1))
 
         # To find the control input, we need to solve a QP
-        result = self.qp_layer(
-            *L_f_Vs, *L_g_Vs,
-            V.unsqueeze(-1),
-            u_learned,
-            torch.tensor([self.clf_relaxation_penalty]),
-            solver_args={"max_iters": 5000000})
-        u = result[0]
-        rs = result[1:]
-        # rs = [torch.tensor([0.0])] * len(self.scenarios)
-        # u = u_learned
+        if self.use_QP:
+            result = self.qp_layer(
+                *L_f_Vs, *L_g_Vs,
+                V.unsqueeze(-1),
+                u_learned,
+                torch.tensor([self.clf_relaxation_penalty]),
+                solver_args={"max_iters": 5000000})
+            u = result[0]
+            rs = result[1:]
+        else:
+            rs = [torch.tensor([0.0])] * len(self.scenarios)
+            u = u_learned
 
         # Average across scenarios
         n_scenarios = len(self.scenarios)
@@ -299,7 +304,7 @@ def lyapunov_loss(x,
     return loss
 
 
-def controller_loss(x, net, print_loss=False):
+def controller_loss(x, net, print_loss=False, use_nominal=False):
     """
     Compute a loss to train the filtered controller
 
@@ -307,14 +312,18 @@ def controller_loss(x, net, print_loss=False):
         x: the points at which to evaluate the loss
         net: a CLF_CBF_QP_Net instance
         print_loss: True to enable printing the values of component terms
+        use_nominal: if True, compare u_learned to nominal. If false, just penalize norm of u
     returns:
         loss: the loss for the given controller function
     """
-    u_nominal = net.u_nominal(x, **net.nominal_scenario)
     u_learned, _, _, _ = net(x)
 
-    # Compute loss based on difference from nominal controller (e.g. LQR).
-    controller_squared_error = 1e-8 * ((u_nominal - u_learned)**2).sum(dim=-1)
+    if use_nominal:
+        # Compute loss based on difference from nominal controller (e.g. LQR).
+        u_nominal = net.u_nominal(x, **net.nominal_scenario)
+        controller_squared_error = 1e-8 * ((u_nominal - u_learned)**2).sum(dim=-1)
+    else:
+        controller_squared_error = 1e-8 * (u_learned**2).sum(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:
