@@ -68,7 +68,7 @@ robust_clf_net.use_QP = False
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, StateIndex.PZ] = -1.0
+    x_sim_start[:, StateIndex.PZ] = -2.0
     x_sim_start[:, StateIndex.VZ] = 2.0
 
     t_sim = 10
