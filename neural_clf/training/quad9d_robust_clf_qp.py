@@ -48,7 +48,7 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 10000000
+N_train = 1000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -60,7 +60,7 @@ for i in range(n_dims):
 x_train = torch.vstack((x_train, x_train_near_origin))
 
 # Also get some testing data
-N_test = 100000
+N_test = 10000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
