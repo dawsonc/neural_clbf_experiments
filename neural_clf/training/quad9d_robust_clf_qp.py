@@ -41,7 +41,7 @@ domain_near_origin = [
     (-0.5, 0.5),              # vx
     (-0.5, 0.5),              # vy
     (-0.5, 0.5),              # vz
-    (-0.8 * g, 1.5 * g),        # f
+    (0.5 * g, 1.5 * g),        # f
     (-np.pi / 3, np.pi / 3),  # roll
     (-np.pi / 3, np.pi / 3),  # pitch
     (-np.pi / 3, np.pi / 3),  # yaw
