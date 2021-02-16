@@ -42,6 +42,13 @@ class LF_Net(nn.Module):
         self.control_affine_dynamics = control_affine_dynamics
         self.u_nominal = u_nominal
 
+        # Set a scale to normalize the dimensions
+        self.scale = torch.ones((n_input,))
+        self.scale[StateIndex.VT] = 100
+        self.scale[StateIndex.POSN] = 1000
+        self.scale[StateIndex.POSE] = 1000
+        self.scale[StateIndex.ALT] = 1000
+
         # The network will have the following architecture
         #
         # n_input -> VFC1 (n_input x n_hidden) -> VFC2 (n_hidden, n_hidden)
@@ -67,6 +74,10 @@ class LF_Net(nn.Module):
         returns:
             u: the value of the barrier at each provided point x [n_batch, n_controls]
         """
+        # Normalize inputs
+        x = x / self.scale
+
+        # Compute controls from forward pass
         tanh = nn.Tanh()
         Ufc1_act = tanh(self.Ufc_layer_1(x))
         Ufc2_act = tanh(self.Ufc_layer_2(Ufc1_act))
@@ -84,6 +95,9 @@ class LF_Net(nn.Module):
             V: the value of the Lyapunov at each provided point x [n_batch, 1]
             grad_V: the gradient of V [n_batch, n_dims]
         """
+        # Normalize inputs
+        x = x / self.scale
+
         # Use the first two layers to compute the Lyapunov function
         tanh = nn.Tanh()
         Vfc1_act = tanh(self.Vfc_layer_1(x))
