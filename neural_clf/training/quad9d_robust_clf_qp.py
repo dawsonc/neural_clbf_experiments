@@ -35,13 +35,13 @@ domain = [
     (-np.pi, np.pi),  # yaw
 ]
 domain_near_origin = [
-    (-0.5, 0.5),                # x
-    (-0.5, 0.5),                # y
-    (-0.5, 0.5),                # z
+    (-0.5, 0.5),              # x
+    (-0.5, 0.5),              # y
+    (-0.5, 0.5),              # z
     (-0.5, 0.5),              # vx
     (-0.5, 0.5),              # vy
     (-0.5, 0.5),              # vz
-    (0.5 * g, 1.5 * g),        # f
+    (0.5 * g, 1.5 * g),       # f
     (-np.pi / 3, np.pi / 3),  # roll
     (-np.pi / 3, np.pi / 3),  # pitch
     (-np.pi / 3, np.pi / 3),  # yaw
@@ -109,7 +109,7 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
-clf_lambda = 0.1
+clf_lambda = 0.0
 safe_level = 1.0
 timestep = 0.01
 n_hidden = 48
@@ -136,7 +136,7 @@ def adjust_relaxation_penalty(clf_net, epoch):
 # We penalize deviation from the nominal controller more heavily to start, then gradually relax
 def adjust_controller_penalty(epoch):
     penalty = init_controller_loss_coeff * (0.5 ** (epoch // 1))
-    return penalty
+    return max(penalty, 1e-10)
 
 
 # Instantiate the network
