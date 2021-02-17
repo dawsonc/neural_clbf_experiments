@@ -89,6 +89,7 @@ with torch.no_grad():
             x_current = x_sim_rclfqp[tstep - 1, :, :]
             # Get the control input at the current state
             u, r, V, Vdot = robust_clf_net(x_current)
+            u[:, 1:] *= 0
 
             u_sim_rclfqp[tstep, :, :] = u
             V_sim_rclfqp[tstep, :, 0] = V

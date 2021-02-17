@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.optim as optim
 from tqdm import trange
-import gc
 
 
 from neural_clf.controllers.clf_qp_net import (
@@ -27,9 +26,9 @@ domain = [
     (-4, 4),                  # x
     (-4, 4),                  # y
     (-4, 4),                  # z
-    (-8, 8),              # vx
-    (-8, 8),              # vy
-    (-8, 8),              # vz
+    (-4, 4),              # vx
+    (-4, 4),              # vy
+    (-4, 4),              # vz
     (-0.5 * g, 2 * g),        # f
     (-np.pi, np.pi),  # roll
     (-np.pi, np.pi),  # pitch
@@ -93,10 +92,10 @@ for i in range(n_dims):
 
 # Also define the safe and unsafe regions
 # Remember that z is positive pointing downwards
-safe_z = 0.2
-unsafe_z = 0.6
-safe_xyz_radius = 1
-unsafe_xyz_radius = 2
+safe_z = 0.1
+unsafe_z = 0.5
+safe_xyz_radius = 3
+unsafe_xyz_radius = 3.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
                                    x_test[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
@@ -114,7 +113,7 @@ clf_lambda = 1.0
 safe_level = 1.0
 timestep = 0.01
 n_hidden = 48
-learning_rate = 0.0001
+learning_rate = 0.001
 epochs = 1000
 batch_size = 64
 init_controller_loss_coeff = 1e-8
@@ -203,9 +202,6 @@ for epoch in range(epochs):
     # Print progress on each epoch, then re-zero accumulated loss for the next epoch
     print(f'Epoch {epoch + 1} training loss: {loss_acumulated / (N_train / batch_size)}')
     loss_acumulated = 0.0
-
-    # Make sure no unused memory is hanging around
-    gc.collect()
 
     # Get loss on test set
     with torch.no_grad():
