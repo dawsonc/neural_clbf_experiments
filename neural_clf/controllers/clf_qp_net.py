@@ -270,15 +270,15 @@ def lyapunov_loss(x,
 
     #   3.) term to encourage V <= safe_level in the safe region
     V_safe, _ = net.compute_lyapunov(x[safe_mask])
-    safe_region_lyapunov_term = F.relu(V_safe - safe_level)
-    if safe_region_lyapunov_term.nelement() > 0:
-        loss += safe_region_lyapunov_term.mean()
+    safe_lyap_term = F.relu(V_safe - safe_level)
+    if safe_lyap_term.nelement() > 0:
+        loss += safe_lyap_term.mean()
 
     #   4.) term to encourage V >= safe_level in the unsafe region
     V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask])
-    unsafe_region_lyapunov_term = F.relu(safe_level - V_unsafe)
-    if unsafe_region_lyapunov_term.nelement() > 0:
-        loss += unsafe_region_lyapunov_term.mean()
+    unsafe_lyap_term = F.relu(safe_level - V_unsafe)
+    if unsafe_lyap_term.nelement() > 0:
+        loss += unsafe_lyap_term.mean()
 
     #   5.) A term to encourage satisfaction of CLF condition
     u, r, V, _ = net(x)
@@ -299,9 +299,12 @@ def lyapunov_loss(x,
 
     if print_loss:
         print(f"                     CLF origin: {goal_term.mean().item()}")
-        print(f"           CLF safe region term: {safe_region_lyapunov_term.mean().item()}")
-        print(f"         CLF unsafe region term: {unsafe_region_lyapunov_term.mean().item()}")
+        print(f"           CLF safe region term: {safe_lyap_term.mean().item()}")
+        print(f"                  (% satisfied): {100 * (safe_lyap_term > 0).mean().item()}")
+        print(f"         CLF unsafe region term: {unsafe_lyap_term.mean().item()}")
+        print(f"                  (% satisfied): {100 * (unsafe_lyap_term > 0).mean().item()}")
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
+        print(f"                  (% satisfied): {100 * (lyap_descent_term > 0).mean().item()}")
         print(f"            CLF relaxation term: {r.mean().item()}")
 
     return loss
