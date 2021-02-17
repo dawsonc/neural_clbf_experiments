@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 from tqdm import trange
+import gc
 
 
 from neural_clf.controllers.clf_qp_net import (
@@ -48,7 +49,7 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 2000000
+N_train = 10000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -202,6 +203,9 @@ for epoch in range(epochs):
     # Print progress on each epoch, then re-zero accumulated loss for the next epoch
     print(f'Epoch {epoch + 1} training loss: {loss_acumulated / (N_train / batch_size)}')
     loss_acumulated = 0.0
+
+    # Make sure no unused memory is hanging around
+    gc.collect()
 
     # Get loss on test set
     with torch.no_grad():
