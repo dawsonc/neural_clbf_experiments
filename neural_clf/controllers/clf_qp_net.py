@@ -298,13 +298,16 @@ def lyapunov_loss(x,
     loss += r.mean()
 
     if print_loss:
+        safe_pct_satisfied = (100.0 * (safe_lyap_term == 0)).mean().item()
+        unsafe_pct_satisfied = (100.0 * (unsafe_lyap_term == 0)).mean().item()
+        descent_pct_satisfied = (100.0 * (lyap_descent_term == 0)).mean().item()
         print(f"                     CLF origin: {goal_term.mean().item()}")
         print(f"           CLF safe region term: {safe_lyap_term.mean().item()}")
-        print(f"                  (% satisfied): {100 * (safe_lyap_term > 0).mean().item()}")
+        print(f"                  (% satisfied): {safe_pct_satisfied}")
         print(f"         CLF unsafe region term: {unsafe_lyap_term.mean().item()}")
-        print(f"                  (% satisfied): {100 * (unsafe_lyap_term > 0).mean().item()}")
+        print(f"                  (% satisfied): {unsafe_pct_satisfied}")
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
-        print(f"                  (% satisfied): {100 * (lyap_descent_term > 0).mean().item()}")
+        print(f"                  (% satisfied): {descent_pct_satisfied}")
         print(f"            CLF relaxation term: {r.mean().item()}")
 
     return loss
