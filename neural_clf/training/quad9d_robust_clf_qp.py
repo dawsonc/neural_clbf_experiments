@@ -49,24 +49,24 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 10000000
+N_train = 1000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_train[:, i] = x_train[:, i] * (max_val - min_val) + min_val
-x_train_near_origin = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
+x_train_near_origin = torch.Tensor(2 * N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_train_near_origin[:, i] = x_train_near_origin[:, i] * (max_val - min_val) + min_val
 x_train = torch.vstack((x_train, x_train_near_origin))
 
 # Also get some testing data
-N_test = 50000
+N_test = 1000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_test[:, i] = x_test[:, i] * (max_val - min_val) + min_val
-x_test_near_origin = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
+x_test_near_origin = torch.Tensor(2 * N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_test_near_origin[:, i] = x_test_near_origin[:, i] * (max_val - min_val) + min_val
@@ -114,10 +114,10 @@ clf_lambda = 1.0
 safe_level = 1.0
 timestep = 0.01
 n_hidden = 48
-learning_rate = 0.001
+learning_rate = 0.0001
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-4
+init_controller_loss_coeff = 1e-8
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -145,7 +145,7 @@ filename = "logs/quad9d_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
