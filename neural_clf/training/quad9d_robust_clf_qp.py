@@ -135,8 +135,8 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # We penalize deviation from the nominal controller more heavily to start, then gradually relax
 def adjust_controller_penalty(epoch):
-    penalty = init_controller_loss_coeff * (0.5 ** (epoch // 1))
-    return max(penalty, 1e-10)
+    penalty = init_controller_loss_coeff * (0.9 ** (epoch // 1))
+    return max(penalty, 1e-5)
 
 
 # Instantiate the network
