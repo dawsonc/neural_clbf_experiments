@@ -10,6 +10,7 @@ from models.quad9d import (
     u_nominal,
     n_controls,
     n_dims,
+    StateIndex,
 )
 
 
@@ -36,7 +37,7 @@ clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 with torch.no_grad():
-    n_grid = 100
+    n_grid = 50
     x = torch.linspace(-4, 4, n_grid)
     z = torch.linspace(-4, 4, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
@@ -49,8 +50,9 @@ with torch.no_grad():
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
             # q = torch.tensor([[-0.0127, -0.0131, -1.2330, -0.1527, -0.0928,  3.4037,  4.7312, -0.0393, 0.2738,  0.2948]])
-            q[0, 0] = x[i]
-            q[0, 2] = z[j]
+            q[0, StateIndex.PX] = x[i]
+            q[0, StateIndex.PZ] = z[j]
+            q[:, StateIndex.F] = 10.0
             _, r, V, V_dot = clf_net(q)
             residuals[j, i] = r
             V_values[j, i] = V
