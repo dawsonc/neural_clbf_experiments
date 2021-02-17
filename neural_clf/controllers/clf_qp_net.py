@@ -265,7 +265,7 @@ def lyapunov_loss(x,
     loss = 0.0
     #   1.) squared value of the Lyapunov function at the goal
     V0, _ = net.compute_lyapunov(x_goal)
-    goal_term = F.relu(V0)
+    goal_term = F.relu(V0)**2
     loss += goal_term.mean()
 
     #   3.) term to encourage V <= safe_level in the safe region
