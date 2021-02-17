@@ -109,7 +109,7 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
-clf_lambda = 0.0
+clf_lambda = 10.0
 safe_level = 1.0
 timestep = 0.01
 n_hidden = 48
@@ -144,7 +144,7 @@ filename = "logs/quad9d_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-clf_net.load_state_dict(checkpoint['clf_net'])
+# clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer

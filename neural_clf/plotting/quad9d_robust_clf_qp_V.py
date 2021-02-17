@@ -36,9 +36,9 @@ clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 with torch.no_grad():
-    n_grid = 50
-    x = torch.linspace(-4, 4, n_grid)
-    z = torch.linspace(-4, 4, n_grid)
+    n_grid = 100
+    x = torch.linspace(-1, 1, n_grid)
+    z = torch.linspace(-1, 1, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
     residuals = torch.zeros(n_grid, n_grid)
     V_values = torch.zeros(n_grid, n_grid)
@@ -48,9 +48,7 @@ with torch.no_grad():
         for j in range(n_grid):
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
-            # q = torch.tensor([[ -0.4193,   0.0562,   0.4578,  -3.7396,  -0.3465,   9.2867, -1, 0.9329,  -1.4039,  -0.9644]])
-            q[:, 2] = -2.0
-            q[:, 5] = 1.0
+            # q = torch.tensor([[-0.0127, -0.0131, -1.2330, -0.1527, -0.0928,  3.4037,  4.7312, -0.0393, 0.2738,  0.2948]])
             q[0, 0] = x[i]
             q[0, 2] = z[j]
             _, r, V, V_dot = clf_net(q)
