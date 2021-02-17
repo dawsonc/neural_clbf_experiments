@@ -48,7 +48,7 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 2000000
+N_train = 200000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -94,8 +94,8 @@ for i in range(n_dims):
 # Remember that z is positive pointing downwards
 safe_z = 0.2
 unsafe_z = 0.6
-safe_xyz_radius = 3
-unsafe_xyz_radius = 3.5
+safe_xyz_radius = 1
+unsafe_xyz_radius = 2
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
                                    x_test[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
@@ -110,13 +110,13 @@ scenarios = [
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
 clf_lambda = 0.0
-safe_level = 10.0
+safe_level = 1.0
 timestep = 0.01
 n_hidden = 48
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-8
+init_controller_loss_coeff = 1e-4
 
 
 def adjust_learning_rate(optimizer, epoch):
