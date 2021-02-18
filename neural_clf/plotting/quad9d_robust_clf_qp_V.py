@@ -67,8 +67,8 @@ with torch.no_grad():
                 c="g", label="Safe")
     axs[0].plot([x.min(), x.max()], [checkpoint["unsafe_z"], checkpoint["unsafe_z"]],
                 c="r", label="Unsafe")
-    safe_circle = plt.Circle((0.0, 0.0), checkpoint["safe_xyz_radius"], color='g', fill=False)
-    unsafe_circle = plt.Circle((0.0, 0.0), checkpoint["unsafe_xyz_radius"], color='r', fill=False)
+    safe_circle = plt.Circle((0.0, 0.0), checkpoint["safe_radius"], color='g', fill=False)
+    unsafe_circle = plt.Circle((0.0, 0.0), checkpoint["unsafe_radius"], color='r', fill=False)
     axs[0].add_patch(safe_circle)
     axs[0].add_patch(unsafe_circle)
     axs[0].set_xlabel('$x$')

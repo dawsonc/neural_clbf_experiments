@@ -23,12 +23,12 @@ torch.set_default_dtype(torch.float64)
 
 # Define operational domain through min/max tuples
 domain = [
-    (-4, 4),                  # x
-    (-4, 4),                  # y
-    (-4, 4),                  # z
-    (-4, 4),              # vx
-    (-4, 4),              # vy
-    (-4, 4),              # vz
+    (-5, 5),                  # x
+    (-5, 5),                  # y
+    (-5, 5),                  # z
+    (-5, 5),              # vx
+    (-5, 5),              # vy
+    (-5, 5),              # vz
     (-0.5 * g, 2 * g),        # f
     (-np.pi, np.pi),  # roll
     (-np.pi, np.pi),  # pitch
@@ -94,12 +94,12 @@ for i in range(n_dims):
 # Remember that z is positive pointing downwards
 safe_z = 0.1
 unsafe_z = 0.5
-safe_xyz_radius = 3
-unsafe_xyz_radius = 3.5
+safe_radius = 3
+unsafe_radius = 3.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
-                                   x_test[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
+                                   (x_test - x0.mean(dim=-1)).norm(dim=-1) <= safe_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
-                                    x_test[:, :StateIndex.PZ + 1].norm(dim=-1) >= unsafe_xyz_radius)
+                                    (x_test - x0.mean(dim=-1)).norm(dim=-1) >= unsafe_radius)
 
 # Define the scenarios
 nominal_scenario = {}
@@ -171,9 +171,9 @@ for epoch in range(epochs):
 
         # Segment into safe/unsafe
         safe_mask = torch.logical_and(x[:, StateIndex.PZ] <= safe_z,
-                                      x[:, :StateIndex.PZ + 1].norm(dim=-1) <= safe_xyz_radius)
+                                      (x - x0.mean(dim=-1)).norm(dim=-1) <= safe_radius)
         unsafe_mask = torch.logical_or(x[:, StateIndex.PZ] >= unsafe_z,
-                                       x[:, :StateIndex.PZ + 1].norm(dim=-1) >= unsafe_xyz_radius)
+                                       (x - x0.mean(dim=-1)).norm(dim=-1) >= unsafe_radius)
 
         # Zero parameter gradients before training
         optimizer.zero_grad()
@@ -228,8 +228,8 @@ for epoch in range(epochs):
                         'relaxation_penalty': clf_net.relaxation_penalty,
                         'safe_z': safe_z,
                         'unsafe_z': unsafe_z,
-                        'safe_xyz_radius': safe_xyz_radius,
-                        'unsafe_xyz_radius': unsafe_xyz_radius,
+                        'safe_radius': safe_radius,
+                        'unsafe_radius': unsafe_radius,
                         'safe_level': safe_level,
                         'clf_lambda': clf_lambda,
                         'clf_net': clf_net.state_dict()}, filename)
