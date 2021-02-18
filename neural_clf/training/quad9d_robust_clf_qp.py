@@ -50,7 +50,7 @@ x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_train[:, i] = x_train[:, i] * (max_val - min_val) + min_val
-x_train_near_origin = torch.Tensor(5 * N_train, n_dims).uniform_(0.0, 1.0)
+x_train_near_origin = torch.Tensor(10 * N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_train_near_origin[:, i] = x_train_near_origin[:, i] * (max_val - min_val) + min_val
@@ -62,7 +62,7 @@ x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_test[:, i] = x_test[:, i] * (max_val - min_val) + min_val
-x_test_near_origin = torch.Tensor(5 * N_test, n_dims).uniform_(0.0, 1.0)
+x_test_near_origin = torch.Tensor(10 * N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_test_near_origin[:, i] = x_test_near_origin[:, i] * (max_val - min_val) + min_val
