@@ -69,10 +69,10 @@ with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, StateIndex.PZ] = -1.0
-    x_sim_start[:, StateIndex.VZ] = 1.0
+    x_sim_start[:, StateIndex.VZ] = 0.1
     x_sim_start[:, StateIndex.F] = 10.0
 
-    t_sim = 2
+    t_sim = 5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -89,7 +89,6 @@ with torch.no_grad():
             x_current = x_sim_rclfqp[tstep - 1, :, :]
             # Get the control input at the current state
             u, r, V, Vdot = robust_clf_net(x_current)
-            u[:, 1:] *= 0
 
             u_sim_rclfqp[tstep, :, :] = u
             V_sim_rclfqp[tstep, :, 0] = V
