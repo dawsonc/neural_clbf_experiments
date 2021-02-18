@@ -57,7 +57,7 @@ for i in range(n_dims):
 x_train = torch.vstack((x_train, x_train_near_origin))
 
 # Also get some testing data
-N_test = 10000
+N_test = 50000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -93,9 +93,9 @@ unsafe_z = 0.5
 safe_radius = 4
 unsafe_radius = 4.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
-                                   (x_test - x0.mean(dim=0)).norm(dim=-1) <= safe_radius)
+                                   x_test[:, :StateIndex.PZ+1].norm(dim=-1) <= safe_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
-                                    (x_test - x0.mean(dim=0)).norm(dim=-1) >= unsafe_radius)
+                                    x_test[:, :StateIndex.PZ+1].norm(dim=-1) >= unsafe_radius)
 
 # Define the scenarios
 nominal_scenario = {}
