@@ -270,13 +270,13 @@ def lyapunov_loss(x,
 
     #   3.) term to encourage V <= safe_level in the safe region
     V_safe, _ = net.compute_lyapunov(x[safe_mask])
-    safe_lyap_term = F.relu(V_safe - safe_level)
+    safe_lyap_term = 100 * F.relu(V_safe - safe_level)
     if safe_lyap_term.nelement() > 0:
         loss += safe_lyap_term.mean()
 
     #   4.) term to encourage V >= safe_level in the unsafe region
     V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask])
-    unsafe_lyap_term = F.relu(safe_level - V_unsafe)
+    unsafe_lyap_term = 100 * F.relu(safe_level - V_unsafe)
     if unsafe_lyap_term.nelement() > 0:
         loss += unsafe_lyap_term.mean()
 
