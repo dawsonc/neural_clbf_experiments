@@ -67,11 +67,10 @@ robust_clf_net.use_QP = False
 # Simulate some results
 with torch.no_grad():
     N_sim = 1
-    x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, StateIndex.PZ] = -0.2
-    x_sim_start[:, StateIndex.VZ] = 0.0
+    x_sim_start = torch.zeros(N_sim, n_dims) - 0.5
+    x_sim_start[:, StateIndex.VZ] = 2.0
 
-    t_sim = 5
+    t_sim = 10
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 

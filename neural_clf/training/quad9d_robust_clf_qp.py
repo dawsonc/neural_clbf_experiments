@@ -33,9 +33,9 @@ domain = [
     (-np.pi / 2, np.pi / 2),  # yaw
 ]
 domain_near_origin = [
-    (-0.5, 0.5),              # x
-    (-0.5, 0.5),              # y
-    (-0.5, 0.5),              # z
+    (-0.5, 0.8),              # x
+    (-0.5, 0.8),              # y
+    (-0.5, 0.8),              # z
     (-0.5, 0.5),              # vx
     (-0.5, 0.5),              # vy
     (-0.5, 0.5),              # vz
@@ -45,24 +45,24 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 200000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_train[:, i] = x_train[:, i] * (max_val - min_val) + min_val
-x_train_near_origin = torch.Tensor(2 * N_train, n_dims).uniform_(0.0, 1.0)
+x_train_near_origin = torch.Tensor(5 * N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_train_near_origin[:, i] = x_train_near_origin[:, i] * (max_val - min_val) + min_val
 x_train = torch.vstack((x_train, x_train_near_origin))
 
 # Also get some testing data
-N_test = 50000
+N_test = 5000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_test[:, i] = x_test[:, i] * (max_val - min_val) + min_val
-x_test_near_origin = torch.Tensor(2 * N_test, n_dims).uniform_(0.0, 1.0)
+x_test_near_origin = torch.Tensor(5 * N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_test_near_origin[:, i] = x_test_near_origin[:, i] * (max_val - min_val) + min_val
@@ -107,19 +107,19 @@ scenarios = [
 relaxation_penalty = 10.0
 clf_lambda = 0.1
 safe_level = 1.0
-timestep = 0.01
+timestep = 0.001
 n_hidden = 48
-learning_rate = 0.001
+learning_rate = 0.005
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-6
+init_controller_loss_coeff = 1e-3
 
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.1 ** (epoch // 4))
+    lr = learning_rate * (0.9 ** (epoch // 3))
     for param_group in optimizer.param_groups:
-        param_group['lr'] = max(lr, 1e-5)
+        param_group['lr'] = max(lr, 1e-4)
 
 
 # We start by allowing the QP to relax the CLF condition, but we'll gradually increase the
@@ -131,7 +131,7 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # We penalize deviation from the nominal controller more heavily to start, then gradually relax
 def adjust_controller_penalty(epoch):
-    penalty = init_controller_loss_coeff * (0.8 ** (epoch // 100))
+    penalty = init_controller_loss_coeff * (0.1 ** (epoch // 100))
     return max(penalty, 1e-8)
 
 
