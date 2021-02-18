@@ -22,12 +22,12 @@ torch.set_default_dtype(torch.float64)
 
 # Define operational domain through min/max tuples
 domain = [
-    (-5, 5),                  # x
-    (-5, 5),                  # y
-    (-5, 5),                  # z
-    (-5, 5),              # vx
-    (-5, 5),              # vy
-    (-5, 5),              # vz
+    (-4, 4),                  # x
+    (-4, 4),                  # y
+    (-4, 4),                  # z
+    (-8, 8),              # vx
+    (-8, 8),              # vy
+    (-8, 8),              # vz
     (-np.pi, np.pi),  # roll
     (-np.pi, np.pi),  # pitch
     (-np.pi, np.pi),  # yaw
@@ -45,7 +45,7 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 1000000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -90,8 +90,8 @@ for i in range(n_dims):
 # Remember that z is positive pointing downwards
 safe_z = 0.1
 unsafe_z = 0.5
-safe_radius = 4
-unsafe_radius = 4.5
+safe_radius = 3
+unsafe_radius = 3.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
                                    x_test[:, :StateIndex.PZ+1].norm(dim=-1) <= safe_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
@@ -105,19 +105,19 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
-clf_lambda = 3.0
+clf_lambda = 0.1
 safe_level = 1.0
 timestep = 0.01
-n_hidden = 64
-learning_rate = 0.0001
+n_hidden = 48
+learning_rate = 0.001
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-2
+init_controller_loss_coeff = 1e-6
 
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.2 ** (epoch // 10))
+    lr = learning_rate * (0.1 ** (epoch // 4))
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -131,7 +131,7 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # We penalize deviation from the nominal controller more heavily to start, then gradually relax
 def adjust_controller_penalty(epoch):
-    penalty = init_controller_loss_coeff * (0.8 ** (epoch // 10))
+    penalty = init_controller_loss_coeff * (0.8 ** (epoch // 100))
     return max(penalty, 1e-8)
 
 
