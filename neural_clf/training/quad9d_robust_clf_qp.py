@@ -112,7 +112,7 @@ n_hidden = 32
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-6
+init_controller_loss_coeff = 1e-0
 
 
 def adjust_learning_rate(optimizer, epoch):
