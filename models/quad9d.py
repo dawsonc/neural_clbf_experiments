@@ -4,20 +4,18 @@ import numpy as np
 from models.utils import lqr
 
 # Continuous time 9-dof quadcopter control-affine dynamics are given by x_dot = f(x) + g(x) * u
-# Oddly enough, it has 10 state variables (but 9 dof in the sense of 3D position, velocity, and
-# orientation).
 #
 # Also oddly, z is defined pointing downwards.
 
 # For the planar vertical takeoff and landing system (PVTOL), the state variables are
 #   x, y, theta, vx, vy, thetadot
 
-# Dynamics from Sun et al. C3M.
+# Dynamics from Sun et al. C3M. but without force as a state
 
 # Define parameters of the inverted pendulum
 g = 9.81  # gravity
 
-n_dims = 10
+n_dims = 9
 n_controls = 4
 
 
@@ -32,18 +30,16 @@ class StateIndex:
     VY = 4
     VZ = 5
 
-    F = 6
-
-    PHI = 7
-    THETA = 8
-    PSI = 9
+    PHI = 6
+    THETA = 7
+    PSI = 8
 
 
 def f_func(x, **kwargs):
     """
     Return the state-dependent part of the continuous-time dynamics for the pvtol system
 
-    x = [[px, py, pz, vx, vy, vz, f, phi, theta, psi]_1, ...]
+    x = [[px, py, pz, vx, vy, vz, phi, theta, psi]_1, ...]
     """
     # x is batched, so has dimensions [n_batches, n_dims]. Compute x_dot for each bit
     f = torch.zeros_like(x)
@@ -53,16 +49,10 @@ def f_func(x, **kwargs):
     f[:, StateIndex.PY] = x[:, StateIndex.VY]  # y
     f[:, StateIndex.PZ] = x[:, StateIndex.VZ]  # z
 
-    # Derivatives of velocities depend on thrust f
-    s_theta = torch.sin(x[:, StateIndex.THETA])
-    c_theta = torch.cos(x[:, StateIndex.THETA])
-    s_phi = torch.sin(x[:, StateIndex.PHI])
-    c_phi = torch.cos(x[:, StateIndex.PHI])
-    f[:, StateIndex.VX] = -x[:, StateIndex.F] * s_theta
-    f[:, StateIndex.VY] = x[:, StateIndex.F] * c_theta * s_phi
-    f[:, StateIndex.VZ] = g - x[:, StateIndex.F] * c_theta * c_phi
+    # Constant acceleration in z due to gravity
+    f[:, StateIndex.VZ] = g
 
-    # Thrust derivative and orientation velocities are directly actuated
+    # Orientation velocities are directly actuated
 
     return f
 
@@ -74,8 +64,17 @@ def g_func(x, **kwargs):
     n_batch = x.size()[0]
     g = torch.zeros(n_batch, n_dims, n_controls, dtype=x.dtype)
 
-    # Derivatives of thrust and all orientations are control variables
-    g[:, StateIndex.F:, :] = torch.eye(n_controls)
+    # Derivatives of linear velocities depend on thrust f
+    s_theta = torch.sin(x[:, StateIndex.THETA])
+    c_theta = torch.cos(x[:, StateIndex.THETA])
+    s_phi = torch.sin(x[:, StateIndex.PHI])
+    c_phi = torch.cos(x[:, StateIndex.PHI])
+    g[:, StateIndex.VX, 0] = -s_theta
+    g[:, StateIndex.VY, 0] = c_theta * s_phi
+    g[:, StateIndex.VZ, 0] = -c_theta * c_phi
+
+    # Derivatives of all orientations are control variables
+    g[:, StateIndex.PHI:, 1:] = torch.eye(n_controls - 1)
 
     return g
 
@@ -89,7 +88,7 @@ def control_affine_dynamics(x, **kwargs):
     return f_func(x), g_func(x)
 
 
-# Linearize the system about the x = 0 (except f = g), u = 0
+# Linearize the system about the x = 0, u = [g, 0, 0, 0]
 A = np.zeros((n_dims, n_dims))
 A[StateIndex.PX, StateIndex.VX] = 1.0
 A[StateIndex.PY, StateIndex.VY] = 1.0
@@ -97,10 +96,10 @@ A[StateIndex.PZ, StateIndex.VZ] = 1.0
 
 A[StateIndex.VX, StateIndex.THETA] = -g
 A[StateIndex.VY, StateIndex.PHI] = g
-A[StateIndex.VZ, StateIndex.F] = -1
 
 B = np.zeros((n_dims, n_controls))
-B[StateIndex.F:, :] = torch.eye(n_controls)
+B[StateIndex.VZ, 0] = -1.0
+B[StateIndex.PHI:, 1:] = torch.eye(n_controls - 1)
 
 # Define cost matrices as identity
 Q = np.eye(n_dims)
@@ -116,9 +115,8 @@ def u_nominal(x, **kwargs):
     """
     # Compute nominal control from feedback + equilibrium control
     K = torch.tensor(K_np, dtype=x.dtype)
-    x_eq = torch.zeros_like(x)
-    x_eq[:, StateIndex.F] = g
-    u_nominal = -(K @ (x - x_eq).T).T
+    u_nominal = -(K @ x.T).T
     u_eq = torch.zeros_like(u_nominal)
+    u_eq[:, 0] = g
 
     return u_nominal + u_eq

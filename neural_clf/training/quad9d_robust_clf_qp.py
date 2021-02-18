@@ -14,7 +14,6 @@ from models.quad9d import (
     u_nominal,
     n_controls,
     n_dims,
-    g,
     StateIndex,
 )
 
@@ -29,7 +28,6 @@ domain = [
     (-5, 5),              # vx
     (-5, 5),              # vy
     (-5, 5),              # vz
-    (-0.5 * g, 2 * g),        # f
     (-np.pi, np.pi),  # roll
     (-np.pi, np.pi),  # pitch
     (-np.pi, np.pi),  # yaw
@@ -41,7 +39,6 @@ domain_near_origin = [
     (-0.5, 0.5),              # vx
     (-0.5, 0.5),              # vy
     (-0.5, 0.5),              # vz
-    (0.5 * g, 1.5 * g),       # f
     (-np.pi / 3, np.pi / 3),  # roll
     (-np.pi / 3, np.pi / 3),  # pitch
     (-np.pi / 3, np.pi / 3),  # yaw
@@ -80,7 +77,6 @@ goal_domain = [
     (0.0, 0.0),              # vx
     (0.0, 0.0),              # vy
     (0.0, 0.0),              # vz
-    (g, g),                  # f
     (0.0, 0.0),  # roll
     (0.0, 0.0),  # pitch
     (0.0, 0.0),  # yaw
@@ -95,7 +91,7 @@ for i in range(n_dims):
 safe_z = 0.1
 unsafe_z = 0.5
 safe_radius = 4
-unsafe_radius = 5
+unsafe_radius = 4.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
                                    (x_test - x0.mean(dim=0)).norm(dim=-1) <= safe_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
@@ -116,7 +112,7 @@ n_hidden = 32
 learning_rate = 0.001
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-4
+init_controller_loss_coeff = 1e-6
 
 
 def adjust_learning_rate(optimizer, epoch):
