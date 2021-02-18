@@ -55,6 +55,7 @@ for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_train_near_origin[:, i] = x_train_near_origin[:, i] * (max_val - min_val) + min_val
 x_train = torch.vstack((x_train, x_train_near_origin))
+N_train = x_train.shape[0]
 
 # Also get some testing data
 N_test = 5000
@@ -67,6 +68,7 @@ for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_test_near_origin[:, i] = x_test_near_origin[:, i] * (max_val - min_val) + min_val
 x_test = torch.vstack((x_test, x_test_near_origin))
+N_test = x_test.shape[0]
 
 # Sample some goal states as well
 N_goal = 1
