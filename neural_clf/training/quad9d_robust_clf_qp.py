@@ -109,10 +109,10 @@ clf_lambda = 3.0
 safe_level = 1.0
 timestep = 0.01
 n_hidden = 64
-learning_rate = 0.001
+learning_rate = 0.0001
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-0
+init_controller_loss_coeff = 1e-2
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -131,7 +131,7 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # We penalize deviation from the nominal controller more heavily to start, then gradually relax
 def adjust_controller_penalty(epoch):
-    penalty = init_controller_loss_coeff * (0.8 ** (epoch // 1))
+    penalty = init_controller_loss_coeff * (0.8 ** (epoch // 10))
     return max(penalty, 1e-8)
 
 
@@ -140,7 +140,7 @@ filename = "logs/quad9d_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
