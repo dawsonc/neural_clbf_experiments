@@ -167,9 +167,9 @@ for epoch in range(epochs):
 
         # Segment into safe/unsafe
         safe_mask = torch.logical_and(x[:, StateIndex.PZ] <= safe_z,
-                                      (x - x0.mean(dim=0)).norm(dim=-1) <= safe_radius)
+                                      x[:, :StateIndex.PZ+1].norm(dim=-1) <= safe_radius)
         unsafe_mask = torch.logical_or(x[:, StateIndex.PZ] >= unsafe_z,
-                                       (x - x0.mean(dim=0)).norm(dim=-1) >= unsafe_radius)
+                                       x[:, :StateIndex.PZ+1].norm(dim=-1) >= unsafe_radius)
 
         # Zero parameter gradients before training
         optimizer.zero_grad()

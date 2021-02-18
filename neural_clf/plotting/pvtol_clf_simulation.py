@@ -74,7 +74,9 @@ with torch.no_grad():
     N_sim = 10
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 1] = 0.0
+    x_sim_start[:, 2] = 1.0
     x_sim_start[:, 4] = -2.0
+    x_sim_start[:, 5] = 1.0
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
