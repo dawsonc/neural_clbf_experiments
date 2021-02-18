@@ -60,12 +60,12 @@ for i in range(n_dims):
 x_train = torch.vstack((x_train, x_train_near_origin))
 
 # Also get some testing data
-N_test = 1000
+N_test = 100000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
     x_test[:, i] = x_test[:, i] * (max_val - min_val) + min_val
-x_test_near_origin = torch.Tensor(2 * N_train, n_dims).uniform_(0.0, 1.0)
+x_test_near_origin = torch.Tensor(2 * N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain_near_origin[i]
     x_test_near_origin[:, i] = x_test_near_origin[:, i] * (max_val - min_val) + min_val
@@ -87,7 +87,7 @@ goal_domain = [
 ]
 x0 = torch.Tensor(N_goal, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
-    min_val, max_val = domain[i]
+    min_val, max_val = goal_domain[i]
     x0[:, i] = x0[:, i] * (max_val - min_val) + min_val
 
 # Also define the safe and unsafe regions
@@ -97,9 +97,9 @@ unsafe_z = 0.5
 safe_radius = 5
 unsafe_radius = 5.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
-                                   (x_test - x0.mean(dim=-1)).norm(dim=-1) <= safe_radius)
+                                   (x_test - x0.mean(dim=0)).norm(dim=-1) <= safe_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
-                                    (x_test - x0.mean(dim=-1)).norm(dim=-1) >= unsafe_radius)
+                                    (x_test - x0.mean(dim=0)).norm(dim=-1) >= unsafe_radius)
 
 # Define the scenarios
 nominal_scenario = {}
@@ -171,9 +171,9 @@ for epoch in range(epochs):
 
         # Segment into safe/unsafe
         safe_mask = torch.logical_and(x[:, StateIndex.PZ] <= safe_z,
-                                      (x - x0.mean(dim=-1)).norm(dim=-1) <= safe_radius)
+                                      (x - x0.mean(dim=0)).norm(dim=-1) <= safe_radius)
         unsafe_mask = torch.logical_or(x[:, StateIndex.PZ] >= unsafe_z,
-                                       (x - x0.mean(dim=-1)).norm(dim=-1) >= unsafe_radius)
+                                       (x - x0.mean(dim=0)).norm(dim=-1) >= unsafe_radius)
 
         # Zero parameter gradients before training
         optimizer.zero_grad()
