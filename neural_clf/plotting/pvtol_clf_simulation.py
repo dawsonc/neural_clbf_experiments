@@ -68,6 +68,7 @@ nonrobust_clf_net = CLF_QP_Net(n_dims,
                                scenarios,
                                nominal_scenario)
 nonrobust_clf_net.load_state_dict(checkpoint['clf_net'])
+nonrobust_clf_net.use_QP = False
 
 # Simulate some results
 with torch.no_grad():
