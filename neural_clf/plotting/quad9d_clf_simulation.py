@@ -43,7 +43,7 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             u_nominal,
                             scenarios,
                             nominal_scenario)
-# robust_clf_net.load_state_dict(checkpoint['clf_net'])
+robust_clf_net.load_state_dict(checkpoint['clf_net'])
 robust_clf_net.use_QP = False
 
 # # Also load the non-robust model from file
@@ -82,26 +82,26 @@ with torch.no_grad():
     Vdot_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     x_sim_rclfqp[0, :, :] = x_sim_start
     t_final_rclfqp = 0
-    # try:
-    #     for tstep in tqdm(range(1, num_timesteps)):
-    #         # Get the current state
-    #         x_current = x_sim_rclfqp[tstep - 1, :, :]
-    #         # Get the control input at the current state
-    #         u, r, V, Vdot = robust_clf_net(x_current)
+    try:
+        for tstep in tqdm(range(1, num_timesteps)):
+            # Get the current state
+            x_current = x_sim_rclfqp[tstep - 1, :, :]
+            # Get the control input at the current state
+            u, r, V, Vdot = robust_clf_net(x_current)
 
-    #         u_sim_rclfqp[tstep, :, :] = u
-    #         V_sim_rclfqp[tstep, :, 0] = V
-    #         Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
-    #         # Get the dynamics
-    #         for i in range(N_sim):
-    #             f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0))
-    #             # Take one step to the future
-    #             xdot = f_val + g_val @ u[i, :]
-    #             x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
+            u_sim_rclfqp[tstep, :, :] = u
+            V_sim_rclfqp[tstep, :, 0] = V
+            Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
+            # Get the dynamics
+            for i in range(N_sim):
+                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0))
+                # Take one step to the future
+                xdot = f_val + g_val @ u[i, :]
+                x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
-    #         t_final_rclfqp = tstep
-    # except (Exception, KeyboardInterrupt):
-    #     print("Controller failed")
+            t_final_rclfqp = tstep
+    except (Exception, KeyboardInterrupt):
+        print("Controller failed")
 
     print("Simulating non-robust CLF QP controller...")
     x_sim_nclfqp = torch.zeros(num_timesteps, N_sim, n_dims)

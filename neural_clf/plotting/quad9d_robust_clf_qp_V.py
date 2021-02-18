@@ -49,10 +49,8 @@ with torch.no_grad():
         for j in range(n_grid):
             # Get the residual from running the model
             q = torch.zeros(1, n_dims)
-            # q = torch.tensor([[-0.0127, -0.0131, -1.2330, -0.1527, -0.0928,  3.4037,  4.7312, -0.0393, 0.2738,  0.2948]])
             q[0, StateIndex.PX] = x[i]
             q[0, StateIndex.PZ] = z[j]
-            q[:, StateIndex.F] = 10.0
             _, r, V, V_dot = clf_net(q)
             residuals[j, i] = r
             V_values[j, i] = V
