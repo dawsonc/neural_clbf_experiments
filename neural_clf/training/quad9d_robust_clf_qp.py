@@ -28,9 +28,9 @@ domain = [
     (-8, 8),              # vx
     (-8, 8),              # vy
     (-8, 8),              # vz
-    (-np.pi, np.pi),  # roll
-    (-np.pi, np.pi),  # pitch
-    (-np.pi, np.pi),  # yaw
+    (-np.pi / 2, np.pi / 2),  # roll
+    (-np.pi / 2, np.pi / 2),  # pitch
+    (-np.pi / 2, np.pi / 2),  # yaw
 ]
 domain_near_origin = [
     (-0.5, 0.5),              # x
