@@ -35,7 +35,7 @@ checkpoint = torch.load(filename)
 nominal_scenario = {"m": m_low}
 scenarios = [
     {"m": m_low},
-    {"m": m_high},
+    # {"m": m_high},
 ]
 
 robust_clf_net = CLF_QP_Net(n_dims,
@@ -71,8 +71,8 @@ robust_clf_net.use_QP = False
 # Simulate some results
 with torch.no_grad():
     N_sim = 1
-    x_sim_start = torch.zeros(N_sim, n_dims) - 1.0
-    x_sim_start[:, StateIndex.VZ] = 3.0
+    x_sim_start = torch.zeros(N_sim, n_dims) - 0.5
+    x_sim_start[:, StateIndex.VZ] = 2.0
 
     t_sim = 20
     delta_t = 0.001

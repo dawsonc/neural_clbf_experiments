@@ -27,9 +27,9 @@ filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": low_I},
+    {"m": low_m, "inertia": low_I},
+    {"m": low_m, "inertia": low_I},
+    {"m": low_m, "inertia": low_I},
 ]
 nominal_scenario = scenarios[0]
 clf_net = CLF_QP_Net(n_dims,
