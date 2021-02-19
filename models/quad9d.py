@@ -15,6 +15,9 @@ from models.utils import lqr
 # Define parameters of the inverted pendulum
 g = 9.81  # gravity
 
+m_low = 1.0
+m_high = 2.0
+
 n_dims = 9
 n_controls = 4
 
@@ -35,7 +38,7 @@ class StateIndex:
     PSI = 8
 
 
-def f_func(x, **kwargs):
+def f_func(x, m=m_low, **kwargs):
     """
     Return the state-dependent part of the continuous-time dynamics for the pvtol system
 
@@ -57,7 +60,7 @@ def f_func(x, **kwargs):
     return f
 
 
-def g_func(x, **kwargs):
+def g_func(x, m=m_low, **kwargs):
     """
     Return the state-dependent coefficient of the control input for the pvtol system.
     """
@@ -69,9 +72,9 @@ def g_func(x, **kwargs):
     c_theta = torch.cos(x[:, StateIndex.THETA])
     s_phi = torch.sin(x[:, StateIndex.PHI])
     c_phi = torch.cos(x[:, StateIndex.PHI])
-    g[:, StateIndex.VX, 0] = -s_theta
-    g[:, StateIndex.VY, 0] = c_theta * s_phi
-    g[:, StateIndex.VZ, 0] = -c_theta * c_phi
+    g[:, StateIndex.VX, 0] = -s_theta / m
+    g[:, StateIndex.VY, 0] = c_theta * s_phi / m
+    g[:, StateIndex.VZ, 0] = -c_theta * c_phi / m
 
     # Derivatives of all orientations are control variables
     g[:, StateIndex.PHI:, 1:] = torch.eye(n_controls - 1)
@@ -79,7 +82,7 @@ def g_func(x, **kwargs):
     return g
 
 
-def control_affine_dynamics(x, **kwargs):
+def control_affine_dynamics(x, m=m_low, **kwargs):
     """
     Return the control-affine dynamics evaluated at the given state
 
@@ -98,7 +101,7 @@ A[StateIndex.VX, StateIndex.THETA] = -g
 A[StateIndex.VY, StateIndex.PHI] = g
 
 B = np.zeros((n_dims, n_controls))
-B[StateIndex.VZ, 0] = -1.0
+B[StateIndex.VZ, 0] = -1.0 / m_low
 B[StateIndex.PHI:, 1:] = torch.eye(n_controls - 1)
 
 # Define cost matrices as identity

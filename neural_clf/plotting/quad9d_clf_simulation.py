@@ -11,6 +11,8 @@ from models.quad9d import (
     n_controls,
     n_dims,
     StateIndex,
+    m_low,
+    m_high,
 )
 
 
@@ -30,10 +32,12 @@ sns.set_theme(context="talk", style="white")
 # Load the robust model from file
 filename = "logs/quad9d_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
-nominal_scenario = {}
+nominal_scenario = {"m": m_low}
 scenarios = [
-    {},
+    {"m": m_low},
+    {"m": m_high},
 ]
+
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
@@ -67,10 +71,10 @@ robust_clf_net.use_QP = False
 # Simulate some results
 with torch.no_grad():
     N_sim = 1
-    x_sim_start = torch.zeros(N_sim, n_dims) - 0.5
-    x_sim_start[:, StateIndex.VZ] = 2.0
+    x_sim_start = torch.zeros(N_sim, n_dims) - 1.0
+    x_sim_start[:, StateIndex.VZ] = 3.0
 
-    t_sim = 10
+    t_sim = 20
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 

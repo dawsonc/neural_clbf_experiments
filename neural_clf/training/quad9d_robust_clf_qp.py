@@ -15,6 +15,8 @@ from models.quad9d import (
     n_controls,
     n_dims,
     StateIndex,
+    m_low,
+    m_high,
 )
 
 
@@ -33,12 +35,12 @@ domain = [
     (-np.pi / 2, np.pi / 2),  # yaw
 ]
 domain_near_origin = [
-    (-0.5, 0.8),              # x
-    (-0.5, 0.8),              # y
-    (-0.5, 0.8),              # z
-    (-0.5, 0.5),              # vx
-    (-0.5, 0.5),              # vy
-    (-0.5, 0.5),              # vz
+    (-0.5, 1.0),              # x
+    (-0.5, 1.0),              # y
+    (-0.5, 1.0),              # z
+    (-1.0, 1.0),              # vx
+    (-1.0, 1.0),              # vy
+    (-1.0, 1.0),              # vz
     (-np.pi / 3, np.pi / 3),  # roll
     (-np.pi / 3, np.pi / 3),  # pitch
     (-np.pi / 3, np.pi / 3),  # yaw
@@ -100,9 +102,10 @@ unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
                                     x_test[:, :StateIndex.PZ+1].norm(dim=-1) >= unsafe_radius)
 
 # Define the scenarios
-nominal_scenario = {}
+nominal_scenario = {"m": m_low}
 scenarios = [
-    {},
+    {"m": m_low},
+    {"m": m_high},
 ]
 
 # Define hyperparameters and define the learning rate and penalty schedule
@@ -133,7 +136,7 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # We penalize deviation from the nominal controller more heavily to start, then gradually relax
 def adjust_controller_penalty(epoch):
-    penalty = init_controller_loss_coeff * (0.1 ** (epoch // 100))
+    penalty = init_controller_loss_coeff * (0.2 ** (epoch // 50))
     return max(penalty, 1e-8)
 
 

@@ -11,6 +11,8 @@ from models.quad9d import (
     n_controls,
     n_dims,
     StateIndex,
+    m_low,
+    m_high,
 )
 
 
@@ -20,10 +22,11 @@ sns.set_theme(context="talk", style="white")
 # Load the model from file
 filename = "logs/quad9d_robust_clf_qp.pth.tar"
 checkpoint = torch.load(filename)
+nominal_scenario = {"m": m_low}
 scenarios = [
-    {},
+    {"m": m_low},
+    {"m": m_high},
 ]
-nominal_scenario = scenarios[0]
 clf_net = CLF_QP_Net(n_dims,
                      checkpoint['n_hidden'],
                      n_controls,
