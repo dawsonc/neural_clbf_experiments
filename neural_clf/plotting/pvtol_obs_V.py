@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import seaborn as sns
 
 from neural_clf.controllers.clf_qp_net import CLF_QP_Net
@@ -19,6 +20,7 @@ from models.pvtol import (
 
 # Beautify plots
 sns.set_theme(context="talk", style="white")
+obs_color = sns.color_palette("pastel")[3]
 
 # Load the model from file
 filename = "logs/pvtol_obs_clf.pth.tar"
@@ -71,6 +73,16 @@ with torch.no_grad():
     axs[0].set_xlabel('$x$')
     axs[0].set_ylabel('$z$')
     axs[0].set_title('$V$')
+    # Add patches for unsafe region
+    obs1 = patches.Rectangle((-1.0, -0.4), 0.5, 0.9, linewidth=1,
+                             edgecolor='r', facecolor=obs_color, label="Unsafe Region")
+    obs2 = patches.Rectangle((0.0, 0.8), 1.0, 0.6, linewidth=1,
+                             edgecolor='r', facecolor=obs_color)
+    ground = patches.Rectangle((-4.0, -4.0), 8.0, 3.7, linewidth=1,
+                               edgecolor='r', facecolor=obs_color)
+    axs[0].add_patch(obs1)
+    axs[0].add_patch(obs2)
+    axs[0].add_patch(ground)
     # axs[0].legend()
 
     contours = axs[1].contourf(x, z, V_dot_values, cmap="magma", levels=20)
