@@ -43,7 +43,7 @@ clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 with torch.no_grad():
-    n_grid = 50
+    n_grid = 100
     x = torch.linspace(-4, 4, n_grid)
     z = torch.linspace(-4, 4, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
@@ -71,7 +71,7 @@ with torch.no_grad():
     axs[0].set_xlabel('$x$')
     axs[0].set_ylabel('$z$')
     axs[0].set_title('$V$')
-    axs[0].legend()
+    # axs[0].legend()
 
     contours = axs[1].contourf(x, z, V_dot_values, cmap="magma", levels=20)
     plt.colorbar(contours, ax=axs[1], orientation="horizontal")
@@ -79,5 +79,4 @@ with torch.no_grad():
     axs[1].set_ylabel('$z$')
     axs[1].set_title('$dV/dt$')
 
-    # plt.savefig("logs/plots/pvtol/lyap_contour.png")
     plt.show()

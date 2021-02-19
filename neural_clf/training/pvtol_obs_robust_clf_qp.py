@@ -205,7 +205,8 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        loss += controller_loss(x, clf_net, print_loss=False, use_eq=x0)
+        loss += controller_loss(x, clf_net,
+                                print_loss=False, use_nominal=True, loss_coeff=1e-4)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -232,7 +233,8 @@ for epoch in range(epochs):
                                   safe_level,
                                   timestep,
                                   print_loss=False)
-            loss += controller_loss(x_test[i:i+batch_size], clf_net, print_loss=False, use_eq=x0)
+            loss += controller_loss(x_test[i:i+batch_size], clf_net,
+                                    print_loss=False, use_nominal=True, loss_coeff=1e-4)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / batch_size)}")
 
