@@ -331,7 +331,7 @@ def controller_loss(x, net, print_loss=False, use_nominal=False, use_eq=None, lo
         # Compute loss based on difference from nominal controller (e.g. LQR).
         u_nominal = net.u_nominal(x, **net.nominal_scenario)
         controller_squared_error = loss_coeff * ((u_nominal - u_learned)**2).sum(dim=-1)
-    elif use_eq:
+    elif use_eq is not None:
         # compute loss based on difference from equilibrium control
         u_eq = net.u_nominal(use_eq, **net.nominal_scenario)
         controller_squared_error = loss_coeff * ((u_eq - u_learned)**2).sum(dim=-1)
