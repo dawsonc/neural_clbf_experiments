@@ -40,9 +40,9 @@ checkpoint = torch.load(filename)
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    {"m": low_m, "inertia": high_I},
-    {"m": high_m, "inertia": low_I},
-    {"m": high_m, "inertia": high_I},
+    # {"m": low_m, "inertia": high_I},
+    # {"m": high_m, "inertia": low_I},
+    # {"m": high_m, "inertia": high_I},
 ]
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],

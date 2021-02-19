@@ -16,7 +16,7 @@ from models.utils import lqr
 g = 9.81  # gravity
 
 m_low = 1.0
-m_high = 2.0
+m_high = 1.5
 
 n_dims = 9
 n_controls = 4
