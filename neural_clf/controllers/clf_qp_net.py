@@ -313,7 +313,7 @@ def lyapunov_loss(x,
     return loss
 
 
-def controller_loss(x, net, print_loss=False, use_nominal=False, loss_coeff=1e-8):
+def controller_loss(x, net, print_loss=False, use_nominal=False, use_eq=None, loss_coeff=1e-8):
     """
     Compute a loss to train the filtered controller
 
@@ -331,6 +331,10 @@ def controller_loss(x, net, print_loss=False, use_nominal=False, loss_coeff=1e-8
         # Compute loss based on difference from nominal controller (e.g. LQR).
         u_nominal = net.u_nominal(x, **net.nominal_scenario)
         controller_squared_error = loss_coeff * ((u_nominal - u_learned)**2).sum(dim=-1)
+    elif use_eq:
+        # compute loss based on difference from equilibrium control
+        u_eq = net.u_nominal(use_eq, **net.nominal_scenario)
+        controller_squared_error = loss_coeff * ((u_eq - u_learned)**2).sum(dim=-1)
     else:
         controller_squared_error = loss_coeff * (u_learned**2).sum(dim=-1)
     loss = controller_squared_error.mean()

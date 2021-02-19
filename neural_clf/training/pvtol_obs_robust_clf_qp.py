@@ -161,10 +161,10 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # Instantiate the network
 filename = "logs/pvtol_obs_clf.pth.tar"
-# checkpoint = torch.load(filename)
+checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
@@ -205,7 +205,7 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        loss += controller_loss(x, clf_net, print_loss=False)
+        loss += controller_loss(x, clf_net, print_loss=False, use_eq=x0)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -232,7 +232,7 @@ for epoch in range(epochs):
                                   safe_level,
                                   timestep,
                                   print_loss=False)
-            loss += controller_loss(x_test[i:i+batch_size], clf_net, print_loss=False)
+            loss += controller_loss(x_test[i:i+batch_size], clf_net, print_loss=False, use_eq=x0)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / batch_size)}")
 
