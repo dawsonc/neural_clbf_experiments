@@ -222,7 +222,7 @@ for epoch in range(epochs):
     with torch.no_grad():
         # Compute loss
         loss = 0.0
-        for i in range(0, N_train, batch_size):
+        for i in range(0, N_test, batch_size):
             loss += lyapunov_loss(x_test[i:i+batch_size],
                                   x0,
                                   safe_mask_test[i:i+batch_size],
@@ -234,7 +234,7 @@ for epoch in range(epochs):
                                   print_loss=False)
             loss += controller_loss(x_test[i:i+batch_size], clf_net, print_loss=False)
 
-        print(f"Epoch {epoch + 1}     test loss: {loss.item()}")
+        print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / batch_size)}")
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() < min(test_losses):
