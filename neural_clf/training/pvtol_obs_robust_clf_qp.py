@@ -164,7 +164,7 @@ filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-clf_net.load_state_dict(checkpoint['clf_net'])
+# clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
