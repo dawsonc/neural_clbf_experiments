@@ -42,13 +42,13 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
                             checkpoint['clf_lambda'],
-                            checkpoint['relaxation_penalty'],
+                            100.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
                             nominal_scenario)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
-robust_clf_net.use_QP = False
+# robust_clf_net.use_QP = False
 
 # # Also load the non-robust model from file
 # filename = "logs/pvtol_robust_clf_qp_single_scenario.pth.tar"
