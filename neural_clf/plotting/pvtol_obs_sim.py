@@ -60,14 +60,14 @@ robust_clf_net.use_QP = False
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, 0] = -2.0
-    x_sim_start[:, 1] = 0.5
+    x_sim_start[:, 0] = 0.1
+    x_sim_start[:, 1] = 0.1
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
-    t_sim = 3
+    t_sim = 1
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -130,10 +130,9 @@ with torch.no_grad():
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
-    fig, axs = plt.subplots(1, 1)
+    fig, axs = plt.subplots(2, 2)
     t = np.linspace(0, t_sim, num_timesteps)
-    # ax1 = axs[0, 0]
-    ax1 = axs
+    ax1 = axs[0, 0]
     ax1.plot([], c=rclfqp_color, label="rCLF")
     ax1.plot([], c=lqr_color, label="LQR")
     ax1.plot(x_sim_rclfqp[:t_final_rclfqp, :, 0], x_sim_rclfqp[:t_final_rclfqp, :, 1],
@@ -157,6 +156,32 @@ with torch.no_grad():
     ax1.legend()
     ax1.set_xlim([-3.0, 2.0])
     ax1.set_ylim([-1.0, 3.0])
+
+    ax2 = axs[0, 1]
+    ax2.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR $u1$")
+    ax2.plot([], c=sns.color_palette("pastel")[0], linestyle=":", label="LQR $u2$")
+    ax2.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLF $u1$")
+    ax2.plot([], c=sns.color_palette("pastel")[1], linestyle=":", label="rCLF $u2$")
+    ax2.plot()
+    ax2.plot(t[1:t_final_rclfqp], u_sim_rclfqp[1:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[1], linestyle="-")
+    ax2.plot(t[1:t_final_rclfqp], u_sim_rclfqp[1:t_final_rclfqp, :, 1],
+             c=sns.color_palette("pastel")[1], linestyle=":")
+    ax2.plot(t[1:], u_sim_lqr[1:, :, 0],
+             c=sns.color_palette("pastel")[0], linestyle="-")
+    ax2.plot(t[1:], u_sim_lqr[1:, :, 1],
+             c=sns.color_palette("pastel")[0], linestyle=":")
+    ax2.legend()
+
+    ax3 = axs[1, 0]
+    ax3.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR V")
+    ax3.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLF V")
+    ax3.plot()
+    ax3.plot(t[1:t_final_rclfqp], V_sim_rclfqp[1:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[1], linestyle="-")
+    ax3.plot(t[1:], V_sim_lqr[1:, :, 0],
+             c=sns.color_palette("pastel")[0], linestyle="-")
+    ax3.legend()
 
     fig.tight_layout()
     plt.show()

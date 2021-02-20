@@ -48,7 +48,7 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             scenarios,
                             nominal_scenario)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
-# robust_clf_net.use_QP = False
+robust_clf_net.use_QP = False
 
 # # Also load the non-robust model from file
 # filename = "logs/pvtol_robust_clf_qp_single_scenario.pth.tar"
@@ -74,7 +74,7 @@ with torch.no_grad():
     x_sim_start = torch.zeros(N_sim, n_dims) - 0.5
     x_sim_start[:, StateIndex.VZ] = 2.0
 
-    t_sim = 20
+    t_sim = 2
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
