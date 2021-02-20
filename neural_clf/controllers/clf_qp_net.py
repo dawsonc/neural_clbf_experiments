@@ -297,6 +297,11 @@ def lyapunov_loss(x,
     #   6.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
 
+    #   7.) Add a term to encourage a local min of CLF at the goal
+    tuning_signal = 0.1 * ((x - x_goal.mean(dim=0))**2).mean(dim=-1)
+    lyap_tuning_term = F.relu(tuning_signal - V)
+    loss += lyap_tuning_term.mean()
+
     if print_loss:
         safe_pct_satisfied = (100.0 * (safe_lyap_term == 0)).mean().item()
         unsafe_pct_satisfied = (100.0 * (unsafe_lyap_term == 0)).mean().item()
@@ -309,6 +314,7 @@ def lyapunov_loss(x,
         print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
         print(f"                  (% satisfied): {descent_pct_satisfied}")
         print(f"            CLF relaxation term: {r.mean().item()}")
+        print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
 
     return loss
 

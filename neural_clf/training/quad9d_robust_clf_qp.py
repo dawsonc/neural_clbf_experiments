@@ -111,7 +111,7 @@ scenarios = [
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
 clf_lambda = 0.1
-safe_level = 1.0
+safe_level = 10.0
 timestep = 0.001
 n_hidden = 48
 learning_rate = 0.005
