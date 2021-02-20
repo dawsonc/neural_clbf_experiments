@@ -298,7 +298,7 @@ def lyapunov_loss(x,
     loss += r.mean()
 
     #   7.) Add a term to encourage a local min of CLF at the goal
-    tuning_signal = 0.5 * ((x - x_goal.mean(dim=0))**2).mean(dim=-1)
+    tuning_signal = 0.1 * ((x - x_goal.mean(dim=0))**2).mean(dim=-1)
     lyap_tuning_term = F.relu(tuning_signal - V)
     loss += lyap_tuning_term.mean()
 

@@ -54,20 +54,20 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             scenarios,
                             nominal_scenario)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
-robust_clf_net.use_QP = False
+# robust_clf_net.use_QP = False
 
 # Simulate some results
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, 0] = 0.1
-    x_sim_start[:, 1] = 0.1
+    x_sim_start[:, 0] = -2.0
+    x_sim_start[:, 1] = 0.5
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
-    t_sim = 1
+    t_sim = 10
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 

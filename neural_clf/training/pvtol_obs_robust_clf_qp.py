@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 10000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -43,7 +43,7 @@ x_train = torch.cat((x_train, x_near_origin), 0)
 N_train = x_train.shape[0]
 
 # Also get some testing data, just to be principled
-N_test = 5000
+N_test = 50000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
@@ -136,7 +136,7 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
-clf_lambda = 0.1
+clf_lambda = 1.0
 safe_level = 10.0
 timestep = 0.01
 n_hidden = 48
@@ -206,7 +206,7 @@ for epoch in range(epochs):
                               timestep,
                               print_loss=False)
         loss += controller_loss(x, clf_net,
-                                print_loss=False, use_nominal=True, loss_coeff=1e-6)
+                                print_loss=False, use_nominal=True, loss_coeff=1e-4)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -234,7 +234,7 @@ for epoch in range(epochs):
                                   timestep,
                                   print_loss=(i == 0))
             loss += controller_loss(x_test[i:i+batch_size], clf_net,
-                                    print_loss=(i == 0), use_nominal=True, loss_coeff=1e-6)
+                                    print_loss=(i == 0), use_nominal=True, loss_coeff=1e-4)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / batch_size)}")
 
