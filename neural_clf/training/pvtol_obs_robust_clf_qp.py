@@ -60,6 +60,7 @@ N_test = x_test.shape[0]
 
 # Create a tensor for the origin as well, which is our goal
 x0 = torch.zeros(1, 6)
+u_eq = u_nominal(x0)
 
 
 # Also define the safe and unsafe regions
@@ -171,7 +172,8 @@ def adjust_relaxation_penalty(clf_net, epoch):
 filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_K_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
-                       control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
+                       control_affine_dynamics, u_nominal, scenarios, nominal_scenario,
+                       x_goal, u_eq)
 # clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
