@@ -302,9 +302,8 @@ def lyapunov_loss(x,
         xdot = f + torch.bmm(g, u).squeeze()
         x_next = x + timestep * xdot
         V_next, _ = net.compute_lyapunov(x_next)
-        Vdot_sim = (V_next.squeeze() - V.squeeze()) / timestep
-        lyap_descent_term_sim += F.relu(Vdot_sim + clf_lambda * V.squeeze())
-    loss += lyap_descent_term_sim.mean() + 100 * lyap_descent_term_expected.mean()
+        lyap_descent_term_sim += F.relu(V_next - (1 - clf_lambda * timestep) * V.squeeze())
+    loss += lyap_descent_term_sim.mean() + lyap_descent_term_expected.mean()
 
     #   6.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
@@ -312,7 +311,7 @@ def lyapunov_loss(x,
     #   7.) Add a term to encourage a local min of CLF at the goal
     tuning_signal = 0.1 * ((x - x_goal.mean(dim=0))**2).mean(dim=-1)
     lyap_tuning_term = F.relu(tuning_signal - V)
-    loss += lyap_tuning_term.mean()
+    # loss += lyap_tuning_term.mean()
 
     if print_loss:
         safe_pct_satisfied = (100.0 * (safe_lyap_term == 0)).mean().item()
