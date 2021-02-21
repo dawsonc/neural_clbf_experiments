@@ -88,6 +88,10 @@ def safe_mask_fn(x):
     obs2_mask = torch.logical_or(obs2_mask_x, obs2_mask_z)
     safe_mask.logical_and_(obs2_mask)
 
+    # Also constrain to be within a norm bound
+    norm_mask = x.norm(dim=-1) <= 4.5
+    safe_mask.logical_and_(norm_mask)
+
     return safe_mask
 
 
@@ -116,6 +120,10 @@ def unsafe_mask_fn(x):
     obs2_mask_z = torch.logical_and(x[:, 1] >= obs2_min_z, x[:, 1] <= obs2_max_z)
     obs2_mask = torch.logical_and(obs2_mask_x, obs2_mask_z)
     unsafe_mask.logical_or_(obs2_mask)
+
+    # Also constrain with a norm bound
+    norm_mask = x.norm(dim=-1) >= 5.0
+    safe_mask.logical_and_(norm_mask)
 
     return unsafe_mask
 
@@ -223,20 +231,21 @@ for epoch in range(epochs):
     with torch.no_grad():
         # Compute loss
         loss = 0.0
-        for i in range(0, N_test, batch_size):
-            loss += lyapunov_loss(x_test[i:i+batch_size],
+        test_batch_size = 20 * batch_size
+        for i in range(0, N_test, test_batch_size):
+            loss += lyapunov_loss(x_test[i:i+test_batch_size],
                                   x0,
-                                  safe_mask_test[i:i+batch_size],
-                                  unsafe_mask_test[i:i+batch_size],
+                                  safe_mask_test[i:i+test_batch_size],
+                                  unsafe_mask_test[i:i+test_batch_size],
                                   clf_net,
                                   clf_lambda,
                                   safe_level,
                                   timestep,
                                   print_loss=(i == 0))
-            loss += controller_loss(x_test[i:i+batch_size], clf_net,
+            loss += controller_loss(x_test[i:i+test_batch_size], clf_net,
                                     print_loss=(i == 0), use_nominal=True, loss_coeff=1e-4)
 
-        print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / batch_size)}")
+        print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / test_batch_size)}")
 
         # Save the model if it's the best yet
         if not test_losses or loss.item() < min(test_losses):
