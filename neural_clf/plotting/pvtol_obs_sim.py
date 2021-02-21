@@ -63,8 +63,8 @@ robust_clf_net.use_QP = False
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, 0] = 1.1
-    x_sim_start[:, 1] = 1.36
+    x_sim_start[:, 0] = 1.22
+    x_sim_start[:, 1] = 0.5
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
