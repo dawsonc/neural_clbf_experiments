@@ -17,6 +17,7 @@ class CLF_K_QP_Net(nn.Module):
 
     def __init__(self, n_input, n_hidden, n_controls, clf_lambda, clf_relaxation_penalty,
                  control_affine_dynamics, u_nominal, scenarios, nominal_scenario,
+                 x_goal, u_eq,
                  G_u=torch.tensor([]), h_u=torch.tensor([])):
         """
         Initialize the network
@@ -36,6 +37,8 @@ class CLF_K_QP_Net(nn.Module):
                        control input for the system (even LQR about origin is fine)
             scenarios: a list of dictionaries specifying the parameters to pass to f_func and g_func
             nominal_scenario: a dictionary specifying the parameters to pass to u_nominal
+            x_goal: the goal state
+            u_eq: the equilibrium control inputs at the goal state
             G_u: a matrix of constraints on fesaible control inputs (n_constraints x n_controls)
             h_u: a vector of constraints on fesaible control inputs (n_constraints x 1)
                 Given G_u and h_u, the CLF QP will additionally enforce G_u u <= h_u
@@ -48,6 +51,8 @@ class CLF_K_QP_Net(nn.Module):
         assert len(scenarios) > 0, "Must pass at least one scenario"
         self.scenarios = scenarios
         self.nominal_scenario = nominal_scenario
+        self.x_goal = x_goal
+        self.u_eq = u_eq
 
         # The network will have the following architecture
         #
@@ -150,7 +155,7 @@ class CLF_K_QP_Net(nn.Module):
         K2 = self.K2fc_layer_2(K2fc1_act)
         K = torch.stack((K1, K2), dim=1)
 
-        return -1.0 * torch.bmm(K, x.unsqueeze(-1))
+        return -1.0 * torch.bmm(K, (x - self.x_goal).unsqueeze(-1)) + self.u_eq
 
     def compute_lyapunov(self, x):
         """
