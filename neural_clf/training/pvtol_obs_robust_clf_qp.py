@@ -5,8 +5,8 @@ import torch.optim as optim
 from tqdm import trange
 
 
-from neural_clf.controllers.clf_qp_net import (
-    CLF_QP_Net,
+from neural_clf.controllers.clf_uK_qp_net import (
+    CLF_K_QP_Net,
     lyapunov_loss,
     controller_loss,
 )
@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 10000000
+N_train = 100000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -170,8 +170,8 @@ def adjust_relaxation_penalty(clf_net, epoch):
 # Instantiate the network
 filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
-clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
-                     control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
+clf_net = CLF_K_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
+                       control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
 # clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 

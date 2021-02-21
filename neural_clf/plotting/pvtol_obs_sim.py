@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import seaborn as sns
 
-from neural_clf.controllers.clf_qp_net import CLF_QP_Net
+from neural_clf.controllers.clf_uK_qp_net import CLF_K_QP_Net
 from models.pvtol import (
     control_affine_dynamics,
     u_nominal,
@@ -44,15 +44,15 @@ scenarios = [
     # {"m": high_m, "inertia": low_I},
     # {"m": high_m, "inertia": high_I},
 ]
-robust_clf_net = CLF_QP_Net(n_dims,
-                            checkpoint['n_hidden'],
-                            n_controls,
-                            checkpoint['clf_lambda'],
-                            checkpoint['relaxation_penalty'],
-                            control_affine_dynamics,
-                            u_nominal,
-                            scenarios,
-                            nominal_scenario)
+robust_clf_net = CLF_K_QP_Net(n_dims,
+                              checkpoint['n_hidden'],
+                              n_controls,
+                              checkpoint['clf_lambda'],
+                              checkpoint['relaxation_penalty'],
+                              control_affine_dynamics,
+                              u_nominal,
+                              scenarios,
+                              nominal_scenario)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
 # robust_clf_net.use_QP = False
 
@@ -61,7 +61,7 @@ with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = 0.1
-    x_sim_start[:, 1] = 0.5
+    x_sim_start[:, 1] = 0.1
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
@@ -85,7 +85,7 @@ with torch.no_grad():
             # Get the control input at the current state
             u, r, V, Vdot = robust_clf_net(x_current)
 
-            u_sim_rclfqp[tstep, :, :] = u
+            u_sim_rclfqp[tstep, :, :] = u.squeeze()
             V_sim_rclfqp[tstep, :, 0] = V
             Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
             # Get the dynamics
@@ -94,11 +94,12 @@ with torch.no_grad():
                                                        m=ms[i],
                                                        inertia=inertias[i])
                 # Take one step to the future
-                xdot = f_val + g_val @ u[i, :]
+                xdot = f_val + g_val @ u[i, :, 0]
                 x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclfqp = tstep
     except (Exception, KeyboardInterrupt):
+        raise
         print("Controller failed")
 
     print("Simulating LQR controller...")
