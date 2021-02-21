@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import seaborn as sns
 
-from neural_clf.controllers.clf_qp_net import CLF_QP_Net
+from neural_clf.controllers.clf_uK_qp_net import CLF_K_QP_Net
 from models.pvtol import (
     control_affine_dynamics,
     u_nominal,
@@ -32,15 +32,15 @@ scenarios = [
     {"m": low_m, "inertia": low_I},
 ]
 nominal_scenario = scenarios[0]
-clf_net = CLF_QP_Net(n_dims,
-                     checkpoint['n_hidden'],
-                     n_controls,
-                     checkpoint['clf_lambda'],
-                     checkpoint['relaxation_penalty'],
-                     control_affine_dynamics,
-                     u_nominal,
-                     scenarios,
-                     nominal_scenario)
+clf_net = CLF_K_QP_Net(n_dims,
+                       checkpoint['n_hidden'],
+                       n_controls,
+                       checkpoint['clf_lambda'],
+                       checkpoint['relaxation_penalty'],
+                       control_affine_dynamics,
+                       u_nominal,
+                       scenarios,
+                       nominal_scenario)
 clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
