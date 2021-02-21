@@ -105,7 +105,7 @@ unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
 nominal_scenario = {"m": m_low}
 scenarios = [
     {"m": m_low},
-    {"m": m_high},
+    # {"m": m_high},
 ]
 
 # Define hyperparameters and define the learning rate and penalty schedule
