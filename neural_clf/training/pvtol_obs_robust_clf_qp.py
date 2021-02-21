@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 10000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -145,11 +145,11 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
-clf_lambda = 1.0
-safe_level = 10.0
+clf_lambda = 0.1
+safe_level = 1.0
 timestep = 0.01
-n_hidden = 16
-learning_rate = 0.001
+n_hidden = 48
+learning_rate = 0.0001
 epochs = 1000
 batch_size = 64
 
@@ -174,7 +174,7 @@ checkpoint = torch.load(filename)
 clf_net = CLF_K_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                        control_affine_dynamics, u_nominal, scenarios, nominal_scenario,
                        x0, u_eq)
-# clf_net.load_state_dict(checkpoint['clf_net'])
+clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
@@ -216,7 +216,7 @@ for epoch in range(epochs):
                               timestep,
                               print_loss=False)
         loss += controller_loss(x, clf_net,
-                                print_loss=False, use_nominal=True, loss_coeff=1e-4)
+                                print_loss=False, use_nominal=True, loss_coeff=1e0)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -244,8 +244,8 @@ for epoch in range(epochs):
                                   safe_level,
                                   timestep,
                                   print_loss=(i == 0))
-            loss += controller_loss(x_test[i:i+test_batch_size], clf_net,
-                                    print_loss=(i == 0), use_nominal=True, loss_coeff=1e-4)
+            # loss += controller_loss(x_test[i:i+test_batch_size], clf_net,
+            #                         print_loss=(i == 0), use_nominal=True, loss_coeff=1e0)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / test_batch_size)}")
 
