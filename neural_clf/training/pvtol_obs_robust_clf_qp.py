@@ -123,7 +123,7 @@ def unsafe_mask_fn(x):
 
     # Also constrain with a norm bound
     norm_mask = x.norm(dim=-1) >= 5.0
-    safe_mask.logical_and_(norm_mask)
+    unsafe_mask.logical_or_(norm_mask)
 
     return unsafe_mask
 
