@@ -304,7 +304,7 @@ def lyapunov_loss(x,
         V_next, _ = net.compute_lyapunov(x_next)
         Vdot_sim = (V_next.squeeze() - V.squeeze()) / timestep
         lyap_descent_term_sim += F.relu(Vdot_sim + clf_lambda * V.squeeze())
-    loss += lyap_descent_term_sim.mean() + lyap_descent_term_expected.mean()
+    loss += lyap_descent_term_sim.mean() + 100 * lyap_descent_term_expected.mean()
 
     #   6.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
