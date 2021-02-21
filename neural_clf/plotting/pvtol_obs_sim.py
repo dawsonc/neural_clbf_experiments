@@ -57,7 +57,7 @@ robust_clf_net = CLF_K_QP_Net(n_dims,
                               checkpoint['x_goal'],
                               checkpoint['u_eq'])
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
-# robust_clf_net.use_QP = False
+robust_clf_net.use_QP = False
 
 # Simulate some results
 with torch.no_grad():
