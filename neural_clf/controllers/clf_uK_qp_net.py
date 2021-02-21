@@ -52,7 +52,7 @@ class CLF_K_QP_Net(nn.Module):
         self.scenarios = scenarios
         self.nominal_scenario = nominal_scenario
         self.x_goal = x_goal
-        self.u_eq = u_eq
+        self.u_eq = u_eq.T
 
         # The network will have the following architecture
         #

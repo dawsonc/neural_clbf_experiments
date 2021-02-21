@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 1000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -148,8 +148,8 @@ relaxation_penalty = 10.0
 clf_lambda = 1.0
 safe_level = 10.0
 timestep = 0.01
-n_hidden = 48
-learning_rate = 0.0001
+n_hidden = 16
+learning_rate = 0.001
 epochs = 1000
 batch_size = 64
 
@@ -259,5 +259,7 @@ for epoch in range(epochs):
                         'h': h,
                         'safe_level': safe_level,
                         'clf_lambda': clf_lambda,
+                        'x_goal': x0,
+                        'u_eq': u_eq,
                         'clf_net': clf_net.state_dict()}, filename)
         test_losses.append(loss.item())

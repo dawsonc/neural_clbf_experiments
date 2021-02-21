@@ -22,6 +22,8 @@ from models.pvtol import (
 sns.set_theme(context="talk", style="white")
 obs_color = sns.color_palette("pastel")[3]
 
+torch.set_default_dtype(torch.float64)
+
 # Load the model from file
 filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
@@ -40,7 +42,9 @@ clf_net = CLF_K_QP_Net(n_dims,
                        control_affine_dynamics,
                        u_nominal,
                        scenarios,
-                       nominal_scenario)
+                       nominal_scenario,
+                       checkpoint['x_goal'],
+                       checkpoint['u_eq'])
 clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 

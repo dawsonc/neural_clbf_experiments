@@ -31,6 +31,7 @@ rclfqp_color = sns.color_palette("pastel")[1]
 # compare the performance of the controllers
 #
 #################################################
+torch.set_default_dtype(torch.float64)
 
 # First simulate the robust CLF QP
 
@@ -52,9 +53,11 @@ robust_clf_net = CLF_K_QP_Net(n_dims,
                               control_affine_dynamics,
                               u_nominal,
                               scenarios,
-                              nominal_scenario)
+                              nominal_scenario,
+                              checkpoint['x_goal'],
+                              checkpoint['u_eq'])
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
-robust_clf_net.use_QP = False
+# robust_clf_net.use_QP = False
 
 # Simulate some results
 with torch.no_grad():
@@ -67,7 +70,7 @@ with torch.no_grad():
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
-    t_sim = 0.5
+    t_sim = 5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
