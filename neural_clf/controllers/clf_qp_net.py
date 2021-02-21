@@ -192,7 +192,7 @@ class CLF_QP_Net(nn.Module):
             u: the input at the current state [n_batch, n_controls]
             r: the relaxation required to satisfy the CLF inequality
             V: the value of the Lyapunov function at a given point
-            Vdot: the time derivative of the Lyapunov function
+            Vdot: the time derivative of the Lyapunov function plus self.clf_lambda * V
         """
         # Compute the Lyapunov and barrier functions
         V, grad_V = self.compute_lyapunov(x)
@@ -221,12 +221,15 @@ class CLF_QP_Net(nn.Module):
             rs = [torch.tensor([0.0])] * len(self.scenarios)
             u = u_learned
 
-        # Average across scenarios
+        # Accumulate across scenarios
         n_scenarios = len(self.scenarios)
-        Vdot = L_f_Vs[0].unsqueeze(-1) + torch.bmm(L_g_Vs[0].unsqueeze(1), u.unsqueeze(-1))
+        Vdot = F.relu(L_f_Vs[0].unsqueeze(-1) + torch.bmm(L_g_Vs[0].unsqueeze(1), u.unsqueeze(-1))
+                      + self.clf_lambda * V)
         relaxation = rs[0]
         for i in range(1, n_scenarios):
-            Vdot += L_f_Vs[i].unsqueeze(-1) + torch.bmm(L_g_Vs[i].unsqueeze(1), u.unsqueeze(-1))
+            Vdot += F.relu(
+                L_f_Vs[i].unsqueeze(-1) + torch.bmm(L_g_Vs[i].unsqueeze(1), u.unsqueeze(-1))
+                + self.clf_lambda * V)
             relaxation += rs[i]
 
         Vdot /= n_scenarios
@@ -281,18 +284,18 @@ def lyapunov_loss(x,
         loss += unsafe_lyap_term.mean()
 
     #   5.) A term to encourage satisfaction of CLF condition
-    u, r, V, _ = net(x)
-    # To compute the change in V, simulate x forward in time and check if V decreases in each
-    # scenario
-    lyap_descent_term = 0.0
+    u, r, V, lyap_descent_term_expected = net(x)
+    # We compute the change in V in two ways: simulating x forward in time and check if V decreases
+    # in each scenario, and using the expected decrease from Vdot
+    lyap_descent_term_sim = 0.0
     for s in net.scenarios:
         f, g = net.dynamics(x, **s)
         xdot = f + torch.bmm(g, u.unsqueeze(-1)).squeeze()
         x_next = x + timestep * xdot
         V_next, _ = net.compute_lyapunov(x_next)
-        Vdot = (V_next.squeeze() - V.squeeze()) / timestep
-        lyap_descent_term += F.relu(Vdot + clf_lambda * V.squeeze())
-    loss += lyap_descent_term.mean()
+        Vdot_sim = (V_next.squeeze() - V.squeeze()) / timestep
+        lyap_descent_term_sim += F.relu(Vdot_sim + clf_lambda * V.squeeze())
+    loss += lyap_descent_term_sim.mean() + lyap_descent_term_expected.mean()
 
     #   6.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
@@ -305,13 +308,13 @@ def lyapunov_loss(x,
     if print_loss:
         safe_pct_satisfied = (100.0 * (safe_lyap_term == 0)).mean().item()
         unsafe_pct_satisfied = (100.0 * (unsafe_lyap_term == 0)).mean().item()
-        descent_pct_satisfied = (100.0 * (lyap_descent_term == 0)).mean().item()
+        descent_pct_satisfied = (100.0 * (lyap_descent_term_sim == 0)).mean().item()
         print(f"                     CLF origin: {goal_term.mean().item()}")
         print(f"           CLF safe region term: {safe_lyap_term.mean().item()}")
         print(f"                  (% satisfied): {safe_pct_satisfied}")
         print(f"         CLF unsafe region term: {unsafe_lyap_term.mean().item()}")
         print(f"                  (% satisfied): {unsafe_pct_satisfied}")
-        print(f"               CLF descent term: {lyap_descent_term.mean().item()}")
+        print(f"               CLF descent term: {lyap_descent_term_sim.mean().item()}")
         print(f"                  (% satisfied): {descent_pct_satisfied}")
         print(f"            CLF relaxation term: {r.mean().item()}")
         print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
