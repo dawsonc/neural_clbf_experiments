@@ -39,7 +39,7 @@ domain_near_origin = [
 ]
 
 # First, sample training data uniformly from the state space
-N_train = 3000000
+N_train = 300000
 x_train = torch.Tensor(N_train, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -52,7 +52,7 @@ x_train = torch.vstack((x_train, x_train_near_origin))
 N_train = x_train.shape[0]
 
 # Also get some testing data
-N_test = 50000
+N_test = 10000
 x_test = torch.Tensor(N_test, n_dims).uniform_(0.0, 1.0)
 for i in range(n_dims):
     min_val, max_val = domain[i]
@@ -201,18 +201,18 @@ for epoch in range(epochs):
     with torch.no_grad():
         # Compute loss
         loss = 0.0
-        test_batch_size = 20 * batch_size
+        test_batch_size = 2 * batch_size
         for i in range(0, N_test, test_batch_size):
-            loss += lyapunov_loss(x_test,
+            loss += lyapunov_loss(x_test[i:i+test_batch_size],
                                   x0,
-                                  safe_mask_test,
-                                  unsafe_mask_test,
+                                  safe_mask_test[i:i+test_batch_size],
+                                  unsafe_mask_test[i:i+test_batch_size],
                                   clf_net,
                                   clf_lambda,
                                   safe_level,
                                   timestep,
                                   print_loss=(i == 0))
-            loss += controller_loss(x_test, clf_net, print_loss=(i == 0), use_nominal=True,
+            loss += controller_loss(x_test[i:i+test_batch_size], clf_net, print_loss=(i == 0), use_nominal=True,
                                     loss_coeff=controller_loss_coeff)
         print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / test_batch_size)}")
 
