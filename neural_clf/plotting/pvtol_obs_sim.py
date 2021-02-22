@@ -60,14 +60,14 @@ robust_clf_net.use_QP = False
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, 0] = 2
-    x_sim_start[:, 1] = 1.4
+    x_sim_start[:, 0] = -0.5
+    x_sim_start[:, 1] = 1
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
-    t_sim = 1
+    t_sim = 2
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -182,6 +182,16 @@ with torch.no_grad():
     ax3.plot(t[1:], V_sim_lqr[1:, :, 0],
              c=sns.color_palette("pastel")[0], linestyle="-")
     ax3.legend()
+
+    ax4 = axs[1, 1]
+    ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR dV/dt")
+    ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLF dV/dt")
+    ax4.plot()
+    ax4.plot(t[1:t_final_rclfqp], Vdot_sim_rclfqp[1:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[1], linestyle="-")
+    ax4.plot(t[1:], Vdot_sim_lqr[1:, :, 0],
+             c=sns.color_palette("pastel")[0], linestyle="-")
+    ax4.legend()
 
     fig.tight_layout()
     plt.show()
