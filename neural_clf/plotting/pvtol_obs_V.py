@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import seaborn as sns
 
-from neural_clf.controllers.clf_uK_qp_net import CLF_K_QP_Net
+from neural_clf.controllers.clf_qp_net import CLF_QP_Net
 from models.pvtol import (
     control_affine_dynamics,
     u_nominal,
@@ -22,8 +22,6 @@ from models.pvtol import (
 sns.set_theme(context="talk", style="white")
 obs_color = sns.color_palette("pastel")[3]
 
-torch.set_default_dtype(torch.float64)
-
 # Load the model from file
 filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
@@ -34,17 +32,15 @@ scenarios = [
     {"m": low_m, "inertia": low_I},
 ]
 nominal_scenario = scenarios[0]
-clf_net = CLF_K_QP_Net(n_dims,
-                       checkpoint['n_hidden'],
-                       n_controls,
-                       checkpoint['clf_lambda'],
-                       checkpoint['relaxation_penalty'],
-                       control_affine_dynamics,
-                       u_nominal,
-                       scenarios,
-                       nominal_scenario,
-                       checkpoint['x_goal'],
-                       checkpoint['u_eq'])
+clf_net = CLF_QP_Net(n_dims,
+                     checkpoint['n_hidden'],
+                     n_controls,
+                     checkpoint['clf_lambda'],
+                     checkpoint['relaxation_penalty'],
+                     control_affine_dynamics,
+                     u_nominal,
+                     scenarios,
+                     nominal_scenario)
 clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
@@ -94,5 +90,15 @@ with torch.no_grad():
     axs[1].set_xlabel('$x$')
     axs[1].set_ylabel('$z$')
     axs[1].set_title('$dV/dt$')
+    # Add patches for unsafe region
+    obs1 = patches.Rectangle((-1.0, -0.4), 0.5, 0.9, linewidth=1,
+                             edgecolor='r', facecolor=obs_color, label="Unsafe Region")
+    obs2 = patches.Rectangle((0.0, 0.8), 1.0, 0.6, linewidth=1,
+                             edgecolor='r', facecolor=obs_color)
+    ground = patches.Rectangle((-4.0, -4.0), 8.0, 3.7, linewidth=1,
+                               edgecolor='r', facecolor=obs_color)
+    axs[1].add_patch(obs1)
+    axs[1].add_patch(obs2)
+    axs[1].add_patch(ground)
 
     plt.show()

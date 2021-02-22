@@ -264,6 +264,7 @@ def lyapunov_loss(x,
     returns:
         loss: the loss for the given Lyapunov function
     """
+    eps = 1e-2
     # Compute loss based on...
     loss = 0.0
     #   1.) squared value of the Lyapunov function at the goal
@@ -273,13 +274,13 @@ def lyapunov_loss(x,
 
     #   3.) term to encourage V <= safe_level in the safe region
     V_safe, _ = net.compute_lyapunov(x[safe_mask])
-    safe_lyap_term = 100 * F.relu(V_safe - safe_level)
+    safe_lyap_term = 100 * F.relu(eps + V_safe - safe_level)
     if safe_lyap_term.nelement() > 0:
         loss += safe_lyap_term.mean()
 
     #   4.) term to encourage V >= safe_level in the unsafe region
     V_unsafe, _ = net.compute_lyapunov(x[unsafe_mask])
-    unsafe_lyap_term = 100 * F.relu(safe_level - V_unsafe)
+    unsafe_lyap_term = 100 * F.relu(eps + safe_level - V_unsafe)
     if unsafe_lyap_term.nelement() > 0:
         loss += unsafe_lyap_term.mean()
 
@@ -293,17 +294,16 @@ def lyapunov_loss(x,
         xdot = f + torch.bmm(g, u.unsqueeze(-1)).squeeze()
         x_next = x + timestep * xdot
         V_next, _ = net.compute_lyapunov(x_next)
-        Vdot_sim = (V_next.squeeze() - V.squeeze()) / timestep
-        lyap_descent_term_sim += F.relu(Vdot_sim + clf_lambda * V.squeeze())
+        lyap_descent_term_sim += F.relu(eps + V_next - (1 - clf_lambda * timestep) * V.squeeze())
     loss += lyap_descent_term_sim.mean() + lyap_descent_term_expected.mean()
 
     #   6.) A term to discourage relaxations of the CLF condition
     loss += r.mean()
 
-    #   7.) Add a term to encourage a local min of CLF at the goal
-    tuning_signal = 0.1 * ((x - x_goal.mean(dim=0))**2).mean(dim=-1)
-    lyap_tuning_term = F.relu(tuning_signal - V)
-    loss += lyap_tuning_term.mean()
+    # #   7.) Add a term to encourage a local min of CLF at the goal
+    # tuning_signal = 0.1 * ((x - x_goal.mean(dim=0))**2).mean(dim=-1)
+    # lyap_tuning_term = F.relu(tuning_signal - V)
+    # loss += lyap_tuning_term.mean()
 
     if print_loss:
         safe_pct_satisfied = (100.0 * (safe_lyap_term == 0)).mean().item()
@@ -317,7 +317,7 @@ def lyapunov_loss(x,
         print(f"               CLF descent term: {lyap_descent_term_sim.mean().item()}")
         print(f"                  (% satisfied): {descent_pct_satisfied}")
         print(f"            CLF relaxation term: {r.mean().item()}")
-        print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
+        # print(f"                CLF tuning term: {lyap_tuning_term.mean().item()}")
 
     return loss
 
@@ -339,13 +339,13 @@ def controller_loss(x, net, print_loss=False, use_nominal=False, use_eq=None, lo
     if use_nominal:
         # Compute loss based on difference from nominal controller (e.g. LQR).
         u_nominal = net.u_nominal(x, **net.nominal_scenario)
-        controller_squared_error = loss_coeff * ((u_nominal - u_learned)**2).sum(dim=-1)
+        controller_squared_error = loss_coeff * (u_nominal - u_learned).norm(dim=-1)
     elif use_eq is not None:
         # compute loss based on difference from equilibrium control
         u_eq = net.u_nominal(use_eq, **net.nominal_scenario)
-        controller_squared_error = loss_coeff * ((u_eq - u_learned)**2).sum(dim=-1)
+        controller_squared_error = loss_coeff * (u_eq - u_learned).norm(dim=-1)
     else:
-        controller_squared_error = loss_coeff * (u_learned**2).sum(dim=-1)
+        controller_squared_error = loss_coeff * u_learned.norm(dim=-1)
     loss = controller_squared_error.mean()
 
     if print_loss:

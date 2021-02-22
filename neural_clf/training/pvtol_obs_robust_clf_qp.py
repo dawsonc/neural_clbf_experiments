@@ -5,8 +5,8 @@ import torch.optim as optim
 from tqdm import trange
 
 
-from neural_clf.controllers.clf_uK_qp_net import (
-    CLF_K_QP_Net,
+from neural_clf.controllers.clf_qp_net import (
+    CLF_QP_Net,
     lyapunov_loss,
     controller_loss,
 )
@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 1000000
+N_train = 100000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -43,7 +43,7 @@ x_train = torch.cat((x_train, x_near_origin), 0)
 N_train = x_train.shape[0]
 
 # Also get some testing data, just to be principled
-N_test = 50000
+N_test = 5000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
@@ -149,14 +149,16 @@ clf_lambda = 0.1
 safe_level = 1.0
 timestep = 0.001
 n_hidden = 48
-learning_rate = 0.0001
+learning_rate = 1e-3
+weight_decay = 1e-6
 epochs = 1000
 batch_size = 64
 
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = learning_rate * (0.9 ** (epoch // 3))
+    # lr = learning_rate * (0.9 ** (epoch // 3))
+    lr = learning_rate
     for param_group in optimizer.param_groups:
         param_group['lr'] = max(lr, 1e-5)
 
@@ -171,14 +173,13 @@ def adjust_relaxation_penalty(clf_net, epoch):
 # Instantiate the network
 filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
-clf_net = CLF_K_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
-                       control_affine_dynamics, u_nominal, scenarios, nominal_scenario,
-                       x0, u_eq)
+clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
+                     control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
 clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
-optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
+optimizer = optim.SGD(clf_net.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 # Train!
 test_losses = []
@@ -215,8 +216,8 @@ for epoch in range(epochs):
                               safe_level,
                               timestep,
                               print_loss=False)
-        # loss += controller_loss(x, clf_net,
-        #                         print_loss=False, use_nominal=True, loss_coeff=1e0)
+        loss += controller_loss(x, clf_net,
+                                print_loss=False, use_nominal=True, loss_coeff=1e-3)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -244,8 +245,8 @@ for epoch in range(epochs):
                                   safe_level,
                                   timestep,
                                   print_loss=(i == 0))
-            # loss += controller_loss(x_test[i:i+test_batch_size], clf_net,
-            #                         print_loss=(i == 0), use_nominal=True, loss_coeff=1e0)
+            loss += controller_loss(x_test[i:i+test_batch_size], clf_net,
+                                    print_loss=(i == 0), use_nominal=True, loss_coeff=1e-3)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / test_batch_size)}")
 
