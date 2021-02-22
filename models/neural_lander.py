@@ -17,6 +17,18 @@ mass = 1.47                  # mass
 Sim_duration = 1000
 
 
+class StateIndex:
+    'list of static state indices'
+
+    PX = 0
+    PY = 1
+    PZ = 2
+
+    VX = 3
+    VY = 4
+    VZ = 5
+
+
 class Network(nn.Module):
     def __init__(self):
         super(Network, self).__init__()
@@ -48,7 +60,7 @@ def read_weight(filename):
 num_dim_x = 6
 num_dim_control = 3
 
-Fa_model = read_weight('data/Fa_net_12_3_full_Lip16.pth')
+Fa_model = read_weight('models/data/Fa_net_12_3_full_Lip16.pth')
 
 
 def Fa_func(z, vx, vy, vz):
@@ -63,10 +75,11 @@ def Fa_func(z, vx, vy, vz):
     state[:, 0, 3] = vz  # velocity
     state[:, 0, 7] = 1.0
     state[:, 0, 8:12] = 6508.0/8000
+    state = state.float()
 
     Fa = Fa_model(state).squeeze(
         1) * torch.tensor([30., 15., 10.]).reshape(1, 3).type(z.type())
-    return Fa
+    return Fa.type(torch.FloatTensor)
 
 
 def Fa_func_np(x):
@@ -83,16 +96,16 @@ def f_func(x, mass=mass):
     # f: bs x n x 1
     bs = x.shape[0]
 
-    x, y, z, vx, vy, vz = [x[:, i, 0] for i in range(num_dim_x)]
-    f = torch.zeros(bs, num_dim_x, 1).type(x.type())
-    f[:, 0, 0] = vx
-    f[:, 1, 0] = vy
-    f[:, 2, 0] = vz
+    x, y, z, vx, vy, vz = [x[:, i] for i in range(num_dim_x)]
+    f = torch.zeros(bs, num_dim_x).type(x.type())
+    f[:, 0] = vx
+    f[:, 1] = vy
+    f[:, 2] = vz
 
     Fa = Fa_func(z, vx, vy, vz)
-    f[:, 3, 0] = Fa[:, 0] / mass
-    f[:, 4, 0] = Fa[:, 1] / mass
-    f[:, 5, 0] = Fa[:, 2] / mass - gravity
+    f[:, 3] = Fa[:, 0] / mass
+    f[:, 4] = Fa[:, 1] / mass
+    f[:, 5] = Fa[:, 2] / mass - gravity
     return f
 
 
@@ -100,9 +113,9 @@ def g_func(x, mass=mass):
     bs = x.shape[0]
     B = torch.zeros(bs, num_dim_x, num_dim_control).type(x.type())
 
-    B[:, 3, 0] = 1
-    B[:, 4, 1] = 1
-    B[:, 5, 2] = 1
+    B[:, 3, 0] = 1 / mass
+    B[:, 4, 1] = 1 / mass
+    B[:, 5, 2] = 1 / mass
     return B
 
 
@@ -116,10 +129,10 @@ def control_affine_dynamics(x, **kwargs):
 
 
 # Define linearized matrices for LQR control (assuming no residual force)
-A = np.zeros(n_dims, n_dims)
+A = np.zeros((n_dims, n_dims))
 A[:3, 3:] = np.eye(3)
-B = np.zeros(n_dims, n_controls)
-B[3:, :] = np.eye(n_controls)
+B = np.zeros((n_dims, n_controls))
+B[3:, :] = np.eye(n_controls) / mass
 # Define cost matrices as identity
 Q = np.eye(n_dims)
 R = np.eye(n_controls)
