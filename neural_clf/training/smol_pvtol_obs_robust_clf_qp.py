@@ -27,33 +27,33 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 10000
-xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
-xydot = torch.Tensor(N_train, 2).uniform_(-4, 4)
+N_train = 1000
+xy = torch.Tensor(N_train, 2).uniform_(-2, 2)
+xydot = torch.Tensor(N_train, 2).uniform_(-2, 2)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi/2, np.pi/2)
 theta_dot = torch.Tensor(N_train, 1).uniform_(-np.pi/2, np.pi/2)
 x_train = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Add some training data just around the origin
-xz = torch.Tensor(2 * N_train, 2).uniform_(-1.0, 1.0)
-xzdot = torch.Tensor(2 * N_train, 2).uniform_(-1.0, 1.0)
-theta = torch.Tensor(2 * N_train, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
-theta_dot = torch.Tensor(2 * N_train, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
+xz = torch.Tensor(10 * N_train, 2).uniform_(-1.0, 1.0)
+xzdot = torch.Tensor(10 * N_train, 2).uniform_(-1.0, 1.0)
+theta = torch.Tensor(10 * N_train, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
+theta_dot = torch.Tensor(10 * N_train, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_train = torch.cat((x_train, x_near_origin), 0)
 N_train = x_train.shape[0]
 
 # Also get some testing data, just to be principled
-N_test = 1000
-xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
-xydot = torch.Tensor(N_test, 2).uniform_(-4, 4)
+N_test = 500
+xy = torch.Tensor(N_test, 2).uniform_(-2, 2)
+xydot = torch.Tensor(N_test, 2).uniform_(-2, 2)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi/2, np.pi/2)
 theta_dot = torch.Tensor(N_test, 1).uniform_(-np.pi/2, np.pi/2)
 x_test = torch.cat((xy, theta, xydot, theta_dot), 1)
 # Also add some test data just around the origin
-xz = torch.Tensor(2 * N_test, 2).uniform_(-1.0, 1.0)
-xzdot = torch.Tensor(2 * N_test, 2).uniform_(-1.0, 1.0)
-theta = torch.Tensor(2 * N_test, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
-theta_dot = torch.Tensor(2 * N_test, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
+xz = torch.Tensor(10 * N_test, 2).uniform_(-1.0, 1.0)
+xzdot = torch.Tensor(10 * N_test, 2).uniform_(-1.0, 1.0)
+theta = torch.Tensor(10 * N_test, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
+theta_dot = torch.Tensor(10 * N_test, 1).uniform_(-0.3 * np.pi, 0.3 * np.pi)
 x_near_origin = torch.cat((xz, theta, xzdot, theta_dot), 1)
 x_test = torch.cat((x_test, x_near_origin), 0)
 N_test = x_test.shape[0]
@@ -145,7 +145,7 @@ scenarios = [
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
 clf_lambda = 0.0
-safe_level = 1.0
+safe_level = 10.0
 timestep = 0.001
 n_hidden = 48
 learning_rate = 1e-3
@@ -191,7 +191,7 @@ for epoch in range(epochs):
     adjust_learning_rate(optimizer, epoch)
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(clf_net, epoch)
-    loss_coeff = max(loss_coeff * 0.1, 1e-5)
+    # loss_coeff = max(loss_coeff * 0.1, 1e-5)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):

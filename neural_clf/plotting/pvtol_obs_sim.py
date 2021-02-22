@@ -35,7 +35,7 @@ rclfqp_color = sns.color_palette("pastel")[1]
 # First simulate the robust CLF QP
 
 # Load the robust model from file
-filename = "logs/smol_pvtol_obs_clf.pth.tar"
+filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
@@ -47,27 +47,27 @@ scenarios = [
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
-                            checkpoint['clf_lambda'],
-                            checkpoint['relaxation_penalty'],
+                            10.0,  # checkpoint['clf_lambda'],
+                            1000.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
                             nominal_scenario)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
-robust_clf_net.use_QP = False
+# robust_clf_net.use_QP = False
 
 # Simulate some results
 with torch.no_grad():
     N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims)
-    x_sim_start[:, 0] = 0.5
-    x_sim_start[:, 1] = 0.5
+    x_sim_start[:, 0] = -1.5
+    x_sim_start[:, 1] = 0.1
 
     # Get a random distribution of masses and inertias
     ms = torch.Tensor(N_sim, 1).uniform_(low_m, low_m)
     inertias = torch.Tensor(N_sim, 1).uniform_(low_I, low_I)
 
-    t_sim = 2
+    t_sim = 5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -76,6 +76,7 @@ with torch.no_grad():
     u_sim_rclfqp = torch.zeros(num_timesteps, N_sim, n_controls)
     V_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     Vdot_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
+    r_sim_rclfqp = torch.zeros(num_timesteps, N_sim, 1)
     x_sim_rclfqp[0, :, :] = x_sim_start
     t_final_rclfqp = 0
     try:
@@ -88,6 +89,7 @@ with torch.no_grad():
             u_sim_rclfqp[tstep, :, :] = u
             V_sim_rclfqp[tstep, :, 0] = V
             Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
+            r_sim_rclfqp[tstep, :, 0] = r
             # Get the dynamics
             for i in range(N_sim):
                 f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0),
@@ -189,6 +191,8 @@ with torch.no_grad():
     ax4.plot()
     ax4.plot(t[1:t_final_rclfqp], Vdot_sim_rclfqp[1:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1], linestyle="-")
+    ax4.plot(t[1:t_final_rclfqp], r_sim_rclfqp[1:t_final_rclfqp, :, 0],
+             c=sns.color_palette("pastel")[2], linestyle="-")
     ax4.plot(t[1:], Vdot_sim_lqr[1:, :, 0],
              c=sns.color_palette("pastel")[0], linestyle="-")
     ax4.legend()
