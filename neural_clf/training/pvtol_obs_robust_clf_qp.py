@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 3000000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi, np.pi)
@@ -43,7 +43,7 @@ x_train = torch.cat((x_train, x_near_origin), 0)
 N_train = x_train.shape[0]
 
 # Also get some testing data, just to be principled
-N_test = 5000
+N_test = 50000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-10, 10)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi, np.pi)
@@ -59,8 +59,7 @@ x_test = torch.cat((x_test, x_near_origin), 0)
 N_test = x_test.shape[0]
 
 # Create a tensor for the origin as well, which is our goal
-x0 = torch.zeros(1, 6)
-u_eq = u_nominal(x0)
+x0 = torch.zeros(1, n_dims)
 
 
 # Also define the safe and unsafe regions
@@ -153,6 +152,7 @@ learning_rate = 1e-3
 weight_decay = 1e-6
 epochs = 1000
 batch_size = 64
+loss_coeff = 0.1
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -191,6 +191,7 @@ for epoch in range(epochs):
     adjust_learning_rate(optimizer, epoch)
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(clf_net, epoch)
+    loss_coeff = max(loss_coeff * 0.9**epoch, 1e-5)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
@@ -217,7 +218,7 @@ for epoch in range(epochs):
                               timestep,
                               print_loss=False)
         loss += controller_loss(x, clf_net,
-                                print_loss=False, use_nominal=True, loss_coeff=1e-3)
+                                print_loss=False, use_nominal=True, loss_coeff=loss_coeff)
 
         # Accumulate loss from this epoch and do backprop
         loss.backward()
@@ -246,7 +247,7 @@ for epoch in range(epochs):
                                   timestep,
                                   print_loss=(i == 0))
             loss += controller_loss(x_test[i:i+test_batch_size], clf_net,
-                                    print_loss=(i == 0), use_nominal=True, loss_coeff=1e-3)
+                                    print_loss=(i == 0), use_nominal=True, loss_coeff=loss_coeff)
 
         print(f"Epoch {epoch + 1}     test loss: {loss.item() / (N_test / test_batch_size)}")
 
