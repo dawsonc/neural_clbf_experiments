@@ -27,7 +27,7 @@ from models.pvtol import (
 torch.set_default_dtype(torch.float64)
 
 # First, sample training data uniformly from the state space
-N_train = 100000
+N_train = 10000
 xy = torch.Tensor(N_train, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_train, 2).uniform_(-4, 4)
 theta = torch.Tensor(N_train, 1).uniform_(-np.pi/2, np.pi/2)
@@ -43,7 +43,7 @@ x_train = torch.cat((x_train, x_near_origin), 0)
 N_train = x_train.shape[0]
 
 # Also get some testing data, just to be principled
-N_test = 10000
+N_test = 1000
 xy = torch.Tensor(N_test, 2).uniform_(-4, 4)
 xydot = torch.Tensor(N_test, 2).uniform_(-4, 4)
 theta = torch.Tensor(N_test, 1).uniform_(-np.pi/2, np.pi/2)
@@ -144,7 +144,7 @@ scenarios = [
 
 # Define hyperparameters and define the learning rate and penalty schedule
 relaxation_penalty = 10.0
-clf_lambda = 0.1
+clf_lambda = 0.0
 safe_level = 1.0
 timestep = 0.001
 n_hidden = 48
@@ -175,7 +175,7 @@ filename = "logs/pvtol_obs_clf.pth.tar"
 checkpoint = torch.load(filename)
 clf_net = CLF_QP_Net(n_dims, n_hidden, n_controls, clf_lambda, relaxation_penalty,
                      control_affine_dynamics, u_nominal, scenarios, nominal_scenario)
-clf_net.load_state_dict(checkpoint['clf_net'])
+# clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer

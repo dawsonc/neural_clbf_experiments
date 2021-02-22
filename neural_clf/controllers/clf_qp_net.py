@@ -223,12 +223,14 @@ class CLF_QP_Net(nn.Module):
 
         # Accumulate across scenarios
         n_scenarios = len(self.scenarios)
-        Vdot = F.relu(L_f_Vs[0].unsqueeze(-1) + torch.bmm(L_g_Vs[0].unsqueeze(1), u.unsqueeze(-1))
-                      + self.clf_lambda * V)
+        Vdot = F.relu(
+            (L_f_Vs[0].unsqueeze(-1) + torch.bmm(L_g_Vs[0].unsqueeze(1), u.unsqueeze(-1))).squeeze()
+            + self.clf_lambda * V)
         relaxation = rs[0]
         for i in range(1, n_scenarios):
             Vdot += F.relu(
-                L_f_Vs[i].unsqueeze(-1) + torch.bmm(L_g_Vs[i].unsqueeze(1), u.unsqueeze(-1))
+                (L_f_Vs[i].unsqueeze(-1) +
+                    torch.bmm(L_g_Vs[i].unsqueeze(1), u.unsqueeze(-1))).squeeze()
                 + self.clf_lambda * V)
             relaxation += rs[i]
 

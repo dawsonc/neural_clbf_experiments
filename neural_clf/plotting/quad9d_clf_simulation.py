@@ -35,7 +35,7 @@ checkpoint = torch.load(filename)
 nominal_scenario = {"m": m_low}
 scenarios = [
     {"m": m_low},
-    # {"m": m_high},
+    {"m": m_high},
 ]
 
 robust_clf_net = CLF_QP_Net(n_dims,
@@ -70,13 +70,16 @@ robust_clf_net.use_QP = False
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 1
-    x_sim_start = torch.zeros(N_sim, n_dims) - 0.1
+    N_sim = 5
+    x_sim_start = torch.zeros(N_sim, n_dims) - 1.0
     x_sim_start[:, StateIndex.VZ] = 1.0
 
-    t_sim = 2
+    t_sim = 5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
+
+    # Get a random distribution of masses and inertias
+    ms = torch.Tensor(N_sim, 1).uniform_(m_low, m_high)
 
     print("Simulating robust CLF QP controller...")
     x_sim_rclfqp = torch.zeros(num_timesteps, N_sim, n_dims)
@@ -97,13 +100,14 @@ with torch.no_grad():
             Vdot_sim_rclfqp[tstep, :, 0] = Vdot.squeeze()
             # Get the dynamics
             for i in range(N_sim):
-                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0))
+                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0), m=ms[i])
                 # Take one step to the future
                 xdot = f_val + g_val @ u[i, :]
                 x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclfqp = tstep
     except (Exception, KeyboardInterrupt):
+        raise
         print("Controller failed")
 
     print("Simulating non-robust CLF QP controller...")
