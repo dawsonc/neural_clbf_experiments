@@ -262,6 +262,5 @@ for epoch in range(epochs):
                         'safe_level': safe_level,
                         'clf_lambda': clf_lambda,
                         'x_goal': x0,
-                        'u_eq': u_eq,
                         'clf_net': clf_net.state_dict()}, filename)
         test_losses.append(loss.item())
