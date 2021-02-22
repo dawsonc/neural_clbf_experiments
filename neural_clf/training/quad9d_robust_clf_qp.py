@@ -92,14 +92,14 @@ for i in range(n_dims):
 
 # Also define the safe and unsafe regions
 # Remember that z is positive pointing downwards
-safe_z = 0.1
-unsafe_z = 0.5
+safe_z = 0.0
+unsafe_z = 0.3
 safe_radius = 3
 unsafe_radius = 3.5
 safe_mask_test = torch.logical_and(x_test[:, StateIndex.PZ] <= safe_z,
-                                   x_test[:, :StateIndex.PZ+1].norm(dim=-1) <= safe_radius)
+                                   x_test.norm(dim=-1) <= safe_radius)
 unsafe_mask_test = torch.logical_or(x_test[:, StateIndex.PZ] >= unsafe_z,
-                                    x_test[:, :StateIndex.PZ+1].norm(dim=-1) >= unsafe_radius)
+                                    x_test.norm(dim=-1) >= unsafe_radius)
 
 # Define the scenarios
 nominal_scenario = {"m": m_low}
@@ -114,10 +114,11 @@ clf_lambda = 0.1
 safe_level = 10.0
 timestep = 0.001
 n_hidden = 48
-learning_rate = 1e-4
+learning_rate = 1e-3
+weight_decay = 1e-6
 epochs = 1000
 batch_size = 64
-init_controller_loss_coeff = 1e-3
+init_controller_loss_coeff = 0.1
 
 
 def adjust_learning_rate(optimizer, epoch):
@@ -136,8 +137,8 @@ def adjust_relaxation_penalty(clf_net, epoch):
 
 # We penalize deviation from the nominal controller more heavily to start, then gradually relax
 def adjust_controller_penalty(epoch):
-    penalty = init_controller_loss_coeff * (0.2 ** (epoch // 50))
-    return max(penalty, 1e-8)
+    penalty = init_controller_loss_coeff * (0.1 ** (epoch // 1))
+    return max(penalty, 1e-5)
 
 
 # Instantiate the network
@@ -149,7 +150,7 @@ clf_net.load_state_dict(checkpoint['clf_net'])
 clf_net.use_QP = False
 
 # Initialize the optimizer
-optimizer = optim.Adam(clf_net.parameters(), lr=learning_rate)
+optimizer = optim.SGD(clf_net.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 # Train!
 test_losses = []
@@ -172,9 +173,9 @@ for epoch in range(epochs):
 
         # Segment into safe/unsafe
         safe_mask = torch.logical_and(x[:, StateIndex.PZ] <= safe_z,
-                                      x[:, :StateIndex.PZ+1].norm(dim=-1) <= safe_radius)
+                                      x.norm(dim=-1) <= safe_radius)
         unsafe_mask = torch.logical_or(x[:, StateIndex.PZ] >= unsafe_z,
-                                       x[:, :StateIndex.PZ+1].norm(dim=-1) >= unsafe_radius)
+                                       x.norm(dim=-1) >= unsafe_radius)
 
         # Zero parameter gradients before training
         optimizer.zero_grad()
