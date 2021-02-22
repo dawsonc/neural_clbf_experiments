@@ -109,8 +109,12 @@ class CLF_QP_Net(nn.Module):
         # constraints for different parameters
         constraints = []
         for i in range(len(self.scenarios)):
-            constraints.append(
-                L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V - clf_relaxations[i] <= 0)
+            if self.clf_relaxation_penalty < float('inf'):
+                constraints.append(
+                    L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V - clf_relaxations[i] <= 0)
+            else:
+                constraints.append(
+                    L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V <= 0.1)
             constraints.append(clf_relaxations[i] >= 0)
         # We also add the user-supplied constraints, if provided
         if len(self.G_u) > 0:
@@ -119,17 +123,18 @@ class CLF_QP_Net(nn.Module):
         # The cost is quadratic in the controls and linear in the relaxation
         # objective_expression = cp.sum_squares(u - u_nominal)
         objective_expression = cp.sum_squares(u - u_nominal)
-        for r in clf_relaxations:
-            objective_expression += cp.multiply(clf_relaxation_penalty_param, r)
+        if self.clf_relaxation_penalty < float('inf'):
+            for r in clf_relaxations:
+                objective_expression += cp.multiply(clf_relaxation_penalty_param, r)
         objective = cp.Minimize(objective_expression)
 
         # Finally, create the optimization problem and the layer based on that
         problem = cp.Problem(objective, constraints)
         assert problem.is_dpp()
         variables = [u] + clf_relaxations
-        parameters = L_f_Vs + L_g_Vs + [V,
-                                        u_nominal,
-                                        clf_relaxation_penalty_param]
+        parameters = L_f_Vs + L_g_Vs + [V, u_nominal]
+        if self.clf_relaxation_penalty < float('inf'):
+            parameters += [clf_relaxation_penalty_param]
         self.qp_layer = CvxpyLayer(problem, variables=variables, parameters=parameters)
 
     def compute_controls(self, x):
@@ -208,12 +213,20 @@ class CLF_QP_Net(nn.Module):
             L_g_Vs.append(torch.bmm(grad_V, g).squeeze(1))
 
         # To find the control input, we need to solve a QP
-        if self.use_QP:
+        if self.use_QP and self.clf_relaxation_penalty < float('inf'):
             result = self.qp_layer(
                 *L_f_Vs, *L_g_Vs,
                 V.unsqueeze(-1),
-                u_learned,
+                self.u_nominal(x, **self.nominal_scenario),
                 torch.tensor([self.clf_relaxation_penalty]),
+                solver_args={"max_iters": 5000000})
+            u = result[0]
+            rs = result[1:]
+        elif self.use_QP and self.clf_relaxation_penalty == float('inf'):
+            result = self.qp_layer(
+                *L_f_Vs, *L_g_Vs,
+                V.unsqueeze(-1),
+                self.u_nominal(x, **self.nominal_scenario),
                 solver_args={"max_iters": 5000000})
             u = result[0]
             rs = result[1:]

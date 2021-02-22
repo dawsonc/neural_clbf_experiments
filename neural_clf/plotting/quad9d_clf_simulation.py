@@ -41,14 +41,14 @@ scenarios = [
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
-                            checkpoint['clf_lambda'],
-                            100.0,  # checkpoint['relaxation_penalty'],
+                            10.0,  # checkpoint['clf_lambda'],
+                            1000.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
                             nominal_scenario)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
-robust_clf_net.use_QP = False
+# robust_clf_net.use_QP = False
 
 # # Also load the non-robust model from file
 # filename = "logs/pvtol_robust_clf_qp_single_scenario.pth.tar"
@@ -70,11 +70,11 @@ robust_clf_net.use_QP = False
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 5
+    N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims) - 1.0
-    x_sim_start[:, StateIndex.VZ] = 1.0
+    x_sim_start[:, StateIndex.VZ] = 1.5
 
-    t_sim = 5
+    t_sim = 2
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -107,7 +107,6 @@ with torch.no_grad():
 
             t_final_rclfqp = tstep
     except (Exception, KeyboardInterrupt):
-        raise
         print("Controller failed")
 
     print("Simulating non-robust CLF QP controller...")
@@ -163,7 +162,6 @@ with torch.no_grad():
                 Vdot_sim_lqr[tstep, :, 0] = (grad_V @ xdot.T).squeeze()
                 x_sim_lqr[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
     except (Exception, KeyboardInterrupt):
-        raise
         print("Controller failed")
 
     fig, axs = plt.subplots(2, 2)
