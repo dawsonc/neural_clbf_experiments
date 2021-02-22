@@ -26,7 +26,8 @@ class CLF_QP_Net(nn.Module):
             n_hidden: number of hiddent layers to use
             n_controls: number of control outputs to use
             clf_lambda: desired exponential convergence rate for the CLF
-            clf_relaxation_penalty: the penalty for relaxing the control lyapunov constraint
+            clf_relaxation_penalty: the penalty for relaxing the control lyapunov constraint.
+                                    Set to float('inf') to disable relaxation
             control_affine_dynamics: a function that takes n_batch x n_dims and returns a tuple of:
                 f_func: a function n_batch x n_dims -> n_batch x n_dims that returns the
                         state-dependent part of the control-affine dynamics
