@@ -191,7 +191,7 @@ for epoch in range(epochs):
     adjust_learning_rate(optimizer, epoch)
     # And follow the relaxation penalty schedule
     adjust_relaxation_penalty(clf_net, epoch)
-    loss_coeff = max(loss_coeff * 0.9**epoch, 1e-5)
+    loss_coeff = max(loss_coeff * 0.1, 1e-5)
 
     loss_acumulated = 0.0
     for i in trange(0, N_train, batch_size):
