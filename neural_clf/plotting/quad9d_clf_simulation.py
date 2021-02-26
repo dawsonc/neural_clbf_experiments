@@ -168,12 +168,9 @@ with torch.no_grad():
     t = np.linspace(0, t_sim, num_timesteps)
     ax1 = axs[0, 0]
     ax1.plot([], c=sns.color_palette("pastel")[1], label="rCLF")
-    ax1.plot([], c=sns.color_palette("pastel")[2], label="CLF")
     ax1.plot([], c=sns.color_palette("pastel")[0], label="LQR")
     ax1.plot(t[:t_final_rclfqp], x_sim_rclfqp[:t_final_rclfqp, :, StateIndex.PZ],
              c=sns.color_palette("pastel")[1])
-    ax1.plot(t[:t_final_nclfqp], x_sim_nclfqp[:t_final_nclfqp, :, StateIndex.PZ],
-             c=sns.color_palette("pastel")[2])
     ax1.plot(t, x_sim_lqr[:, :, StateIndex.PZ], c=sns.color_palette("pastel")[0])
     ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
     ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
@@ -186,24 +183,18 @@ with torch.no_grad():
     ax3 = axs[1, 1]
     ax3.plot([], c=sns.color_palette("pastel")[0], label="LQR V")
     ax3.plot([], c=sns.color_palette("pastel")[1], label="rCLF V")
-    ax3.plot([], c=sns.color_palette("pastel")[2], label="CLF V")
     ax3.plot(t[1:], V_sim_lqr[1:, :, 0],
              c=sns.color_palette("pastel")[0])
     ax3.plot(t[1:t_final_rclfqp], V_sim_rclfqp[1:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
-    ax3.plot(t[1:t_final_nclfqp], V_sim_nclfqp[1:t_final_nclfqp, :, 0],
-             c=sns.color_palette("pastel")[2])
     ax3.plot(t, t * 0.0, c="k")
     ax3.legend()
 
     ax2 = axs[0, 1]
     ax2.plot([], c=sns.color_palette("pastel")[0], label="LQR dV/dt")
     ax2.plot([], c=sns.color_palette("pastel")[1], label="rCLF dV/dt")
-    ax2.plot([], c=sns.color_palette("pastel")[2], label="CLF dV/dt")
     ax2.plot(t[1:t_final_rclfqp], Vdot_sim_rclfqp[1:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1])
-    ax2.plot(t[1:t_final_nclfqp], Vdot_sim_nclfqp[1:t_final_nclfqp, :, 0],
-             c=sns.color_palette("pastel")[2])
     ax2.plot(t[1:], Vdot_sim_lqr[1:, :, 0],
              c=sns.color_palette("pastel")[0])
     ax2.plot(t, t * 0.0, c="k")
@@ -212,12 +203,9 @@ with torch.no_grad():
     ax4 = axs[1, 0]
     ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="LQR $f$")
     ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLF $f$")
-    ax4.plot([], c=sns.color_palette("pastel")[2], linestyle="-", label="CLF $f$")
     ax4.plot()
     ax4.plot(t[1:t_final_rclfqp], u_sim_rclfqp[1:t_final_rclfqp, :, 0],
              c=sns.color_palette("pastel")[1], linestyle="-")
-    ax4.plot(t[1:t_final_nclfqp], u_sim_nclfqp[1:t_final_nclfqp, :, 0],
-             c=sns.color_palette("pastel")[2], linestyle="-")
     ax4.plot(t[1:], u_sim_lqr[1:, :, 0],
              c=sns.color_palette("pastel")[0], linestyle="-")
     ax4.legend()

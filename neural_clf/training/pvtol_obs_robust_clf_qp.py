@@ -137,9 +137,9 @@ unsafe_mask_test = unsafe_mask_fn(x_test)
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    # {"m": low_m, "inertia": high_I},
-    # {"m": high_m, "inertia": low_I},
-    # {"m": high_m, "inertia": high_I},
+    {"m": low_m, "inertia": high_I},
+    {"m": high_m, "inertia": low_I},
+    {"m": high_m, "inertia": high_I},
 ]
 
 # Define hyperparameters and define the learning rate and penalty schedule
