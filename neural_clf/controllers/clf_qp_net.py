@@ -115,7 +115,7 @@ class CLF_QP_Net(nn.Module):
                     L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V - clf_relaxations[i] <= 0)
             else:
                 constraints.append(
-                    L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V <= 0.1)
+                    L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V <= 0.0)
             constraints.append(clf_relaxations[i] >= 0)
         # We also add the user-supplied constraints, if provided
         if len(self.G_u) > 0:

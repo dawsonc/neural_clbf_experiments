@@ -45,14 +45,14 @@ checkpoint = torch.load(filename)
 nominal_scenario = {"m": low_m, "inertia": low_I}
 scenarios = [
     {"m": low_m, "inertia": low_I},
-    {"m": low_m, "inertia": high_I},
-    {"m": high_m, "inertia": low_I},
-    {"m": high_m, "inertia": high_I},
+    {"m": low_m, "inertia": 1.05 * low_I},
+    {"m": 1.05 * low_m, "inertia": low_I},
+    {"m": 1.05 * low_m, "inertia": 1.05 * low_I},
 ]
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
-                            10.0,  # checkpoint['clf_lambda'],
+                            0.01,  #7.5,  # checkpoint['clf_lambda'],
                             1000.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
@@ -63,16 +63,20 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 1
+    N_sim = 2
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = -1.5
     x_sim_start[:, 1] = 0.1
 
-    # Get a random distribution of masses and inertias
-    ms = torch.Tensor(N_sim, 1).uniform_(low_m, high_m)
-    inertias = torch.Tensor(N_sim, 1).uniform_(low_I, high_I)
+    goal_V = 0.02
 
-    t_sim = 2
+    # Get a random distribution of masses and inertias
+    # ms = torch.tensor([low_m, low_m, low_m * 1.05, low_m * 1.05]).reshape(N_sim, 1)
+    # inertias = torch.tensor([low_I, low_I * 1.05, low_I, low_I * 1.05]).reshape(N_sim, 1)
+    ms = torch.tensor([low_m * 1.05, low_m * 1.05]).reshape(N_sim, 1)
+    inertias = torch.tensor([low_I, low_I * 1.05]).reshape(N_sim, 1)
+
+    t_sim = 4
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -86,6 +90,7 @@ with torch.no_grad():
     t_final_rclbfqp = 0
     rclbf_runtime = 0.0
     rclbf_calls = 0.0
+    done = [False] * N_sim
     try:
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
@@ -106,8 +111,12 @@ with torch.no_grad():
                 f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0),
                                                        m=ms[i],
                                                        inertia=inertias[i])
-                # Take one step to the future
+                # Take one step to the future if we're not done
                 xdot = f_val + g_val @ u[i, :]
+                if V_sim_rclbfqp[tstep, i, 0] < goal_V:
+                    done[i] = True
+                if done[i]:
+                    xdot *= 0.0
                 x_sim_rclbfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclbfqp = tstep
@@ -120,13 +129,14 @@ with torch.no_grad():
     u_sim_mpc = torch.zeros(num_timesteps, N_sim, n_controls)
     V_sim_mpc = torch.zeros(num_timesteps, N_sim, 1)
     Vdot_sim_mpc = torch.zeros(num_timesteps, N_sim, 1)
-    mpc_ctrl_period = 1/20.0
+    mpc_ctrl_period = 1/10.0
     mpc_update_frequency = int(mpc_ctrl_period / delta_t)
     obs_pos = np.array([[-0.75, 0.25], [0.0, 1.1], [0.6, 1.1], [1.0, 1.1]])
-    obs_r = np.array([0.354, 0.3, 0.3, 0.3])
+    obs_r = np.array([0.36, 0.3, 0.3, 0.3])
     mpc_runtime = 0.0
     mpc_calls = 0.0
     t_final_mpc = 0
+    done = [False] * N_sim
     try:
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
@@ -155,17 +165,22 @@ with torch.no_grad():
                     u_sim_mpc[tstep, i, :] = u
                 # Take one step to the future
                 xdot = f_val + g_val @ u
+                if V_sim_mpc[tstep, i, 0] < goal_V:
+                    done[i] = True
+                if done[i]:
+                    xdot *= 0.0
                 Vdot_sim_mpc[tstep, :, 0] = (grad_V @ xdot.T).squeeze()
                 x_sim_mpc[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
             t_final_mpc = tstep
+            1/0.0
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
     print(f"rCLBF qp total runtime = {rclbf_runtime} s ({rclbf_runtime / rclbf_calls} s per iteration)")
     print(f"MPC total runtime = {mpc_runtime} s ({mpc_runtime / mpc_calls} s per iteration)")
 
-    fig, axs = plt.subplots(2, 2)
     t = np.linspace(0, t_sim, num_timesteps)
+    fig, axs = plt.subplots(2, 2)
     ax1 = axs[0, 0]
     ax1.plot([], c=rclbfqp_color, label="rCLBF")
     ax1.plot([], c=mpc_color, label="MPC")
@@ -231,6 +246,65 @@ with torch.no_grad():
 
     fig.tight_layout()
     plt.show()
+
+    # fig, axs = plt.subplots(2, 3)
+    # ax0 = axs[0, 0]
+    # ax0.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="MPC")
+    # ax0.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLBF")
+    # ax0.plot()
+    # ax0.plot(t[1:t_final_rclbfqp], x_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
+    #          c=sns.color_palette("pastel")[1], linestyle="-")
+    # ax0.plot(t[1:t_final_mpc], x_sim_mpc[1:t_final_mpc, :, 0],
+    #          c=sns.color_palette("pastel")[0], linestyle="-")
+    # ax0.set_ylabel("x")
+    # ax0 = axs[0, 1]
+    # ax0.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="MPC")
+    # ax0.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLBF")
+    # ax0.plot()
+    # ax0.plot(t[1:t_final_rclbfqp], x_sim_rclbfqp[1:t_final_rclbfqp, :, 1],
+    #          c=sns.color_palette("pastel")[1], linestyle="-")
+    # ax0.plot(t[1:t_final_mpc], x_sim_mpc[1:t_final_mpc, :, 1],
+    #          c=sns.color_palette("pastel")[0], linestyle="-")
+    # ax0.set_ylabel("z")
+    # ax0 = axs[0, 2]
+    # ax0.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="MPC")
+    # ax0.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLBF")
+    # ax0.plot()
+    # ax0.plot(t[1:t_final_rclbfqp], x_sim_rclbfqp[1:t_final_rclbfqp, :, 2],
+    #          c=sns.color_palette("pastel")[1], linestyle="-")
+    # ax0.plot(t[1:t_final_mpc], x_sim_mpc[1:t_final_mpc, :, 2],
+    #          c=sns.color_palette("pastel")[0], linestyle="-")
+    # ax0.set_ylabel("theta")
+    # ax0 = axs[1, 0]
+    # ax0.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="MPC")
+    # ax0.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLBF")
+    # ax0.plot()
+    # ax0.plot(t[1:t_final_rclbfqp], x_sim_rclbfqp[1:t_final_rclbfqp, :, 3],
+    #          c=sns.color_palette("pastel")[1], linestyle="-")
+    # ax0.plot(t[1:t_final_mpc], x_sim_mpc[1:t_final_mpc, :, 3],
+    #          c=sns.color_palette("pastel")[0], linestyle="-")
+    # ax0.set_ylabel("x_d")
+    # ax0 = axs[1, 1]
+    # ax0.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="MPC")
+    # ax0.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLBF")
+    # ax0.plot()
+    # ax0.plot(t[1:t_final_rclbfqp], x_sim_rclbfqp[1:t_final_rclbfqp, :, 4],
+    #          c=sns.color_palette("pastel")[1], linestyle="-")
+    # ax0.plot(t[1:t_final_mpc], x_sim_mpc[1:t_final_mpc, :, 4],
+    #          c=sns.color_palette("pastel")[0], linestyle="-")
+    # ax0.set_ylabel("z_d")
+    # ax0 = axs[1, 2]
+    # ax0.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="MPC")
+    # ax0.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLBF")
+    # ax0.plot()
+    # ax0.plot(t[1:t_final_rclbfqp], x_sim_rclbfqp[1:t_final_rclbfqp, :, 5],
+    #          c=sns.color_palette("pastel")[1], linestyle="-")
+    # ax0.plot(t[1:t_final_mpc], x_sim_mpc[1:t_final_mpc, :, 5],
+    #          c=sns.color_palette("pastel")[0], linestyle="-")
+    # ax0.set_ylabel("theta_d")
+
+    # fig.tight_layout()
+    # plt.show()
 
     # # Animate the neural controller
     # fig, ax = plt.subplots(figsize=(10, 6))
