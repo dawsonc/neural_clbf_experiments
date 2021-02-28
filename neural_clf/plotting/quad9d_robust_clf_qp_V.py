@@ -3,6 +3,7 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
+import matplotlib.ticker as ticker
 import seaborn as sns
 
 from neural_clf.controllers.clf_qp_net import CLF_QP_Net
@@ -97,11 +98,31 @@ with torch.no_grad():
     axs[0].set_xlim([-4, 4])
     axs[0].set_ylim([-1, 4])
 
-    contours = axs[1].contourf(x, z, V_dot_values, cmap="magma", levels=20)
-    plt.colorbar(contours, ax=axs[1], orientation="horizontal")
+    contours = axs[1].contourf(x, -z, V_dot_values, cmap="Greys", levels=20)
+
+    xy_safe = np.zeros((500, 2))
+    xy_safe[:, 0] = checkpoint["safe_radius"] * np.cos(theta)
+    xy_safe[:, 1] = np.maximum(checkpoint["safe_radius"] * np.sin(theta), -checkpoint["safe_z"])
+    safe_patch = Polygon(xy_safe, color="g", fill=False)
+    axs[1].add_patch(safe_patch)
+    xy_unsafe = np.zeros((500, 2))
+    xy_unsafe[:, 0] = checkpoint["unsafe_radius"] * np.cos(theta)
+    xy_unsafe[:, 1] = np.maximum(checkpoint["unsafe_radius"] * np.sin(theta), -checkpoint["unsafe_z"])
+    unsafe_patch = Polygon(xy_unsafe, color="r", fill=False)
+    axs[1].add_patch(unsafe_patch)
+
+    def fmt(x, pos):
+        a, b = '{:.2e}'.format(x).split('e')
+        b = int(b)
+        return r'${} \times 10^{{{}}}$'.format(a, b)
+
+    cbar = plt.colorbar(contours, ax=axs[1], orientation="horizontal", format=ticker.FuncFormatter(fmt))
+    cbar.ax.set_xticklabels(cbar.ax.get_xticklabels(), rotation=45)
     axs[1].set_xlabel('$x$')
     axs[1].set_ylabel('$z$')
-    axs[1].set_title('$dV/dt$')
+    axs[1].set_title('max($dV/dt$, 0)')
+    axs[0].set_xlim([-4, 4])
+    axs[0].set_ylim([-1, 4])
 
     # plt.savefig("logs/plots/pvtol/lyap_contour.png")
     plt.show()
