@@ -3,6 +3,7 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+import time
 
 from neural_clf.controllers.clf_qp_net import CLF_QP_Net
 from neural_clf.controllers.mpc import NlHoverMPC
@@ -95,12 +96,18 @@ with torch.no_grad():
     Vdot_sim_rclbfqp = torch.zeros(num_timesteps, N_sim, 1)
     x_sim_rclbfqp[0, :, :] = x_sim_start
     t_final_rclbfqp = 0
+    rclbf_runtime = 0.0
+    rclbf_calls = 0.0
     try:
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
             x_current = x_sim_rclbfqp[tstep - 1, :, :]
             # Get the control input at the current state
+            ts = time.time()
             u, r, V, Vdot = robust_clf_net(x_current)
+            tf = time.time()
+            rclbf_runtime += tf - ts
+            rclbf_calls += 1
 
             u_sim_rclbfqp[tstep, :, :] = u
             V_sim_rclbfqp[tstep, :, 0] = V
@@ -156,6 +163,8 @@ with torch.no_grad():
     mpc_runtime = 0.0
     mpc_calls = 0.0
     t_final_mpc = 0
+    mpc_runtime = 0.0
+    mpc_calls = 0.0
     try:
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
@@ -171,7 +180,10 @@ with torch.no_grad():
 
                 # Get the control input at the current state if we're at the appropriate timing
                 if tstep == 1 or tstep % mpc_update_frequency == 0:
+                    ts = time.time()
                     u = torch.tensor(NlHoverMPC(x_current[i, :].numpy()))
+                    tf = time.time()
+                    mpc_runtime += tf - ts
                     mpc_calls += 1
                     u_sim_mpc[tstep, i, :] = u
                 else:
@@ -184,6 +196,9 @@ with torch.no_grad():
                 x_sim_mpc[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
+
+    print(f"rCLBF qp total runtime = {rclbf_runtime} s ({rclbf_runtime / rclbf_calls} s per iteration)")
+    print(f"MPC total runtime = {mpc_runtime} s ({mpc_runtime / mpc_calls} s per iteration)")
 
     # fig, axs = plt.subplots(2, 2)
     fig, axs = plt.subplots(1, 1)

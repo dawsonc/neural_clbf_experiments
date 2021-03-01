@@ -115,7 +115,7 @@ class CLF_QP_Net(nn.Module):
                     L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V - clf_relaxations[i] <= 0)
             else:
                 constraints.append(
-                    L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V <= 0.0)
+                    L_f_Vs[i] + L_g_Vs[i] @ u + self.clf_lambda * V <= 0.1)
             constraints.append(clf_relaxations[i] >= 0)
         # We also add the user-supplied constraints, if provided
         if len(self.G_u) > 0:
@@ -220,7 +220,7 @@ class CLF_QP_Net(nn.Module):
                 V.unsqueeze(-1),
                 self.u_nominal(x, **self.nominal_scenario),
                 torch.tensor([self.clf_relaxation_penalty]),
-                solver_args={"max_iters": 5000000})
+                solver_args={"max_iters": 50000000})
             u = result[0]
             rs = result[1:]
         elif self.use_QP and self.clf_relaxation_penalty == float('inf'):
@@ -228,7 +228,7 @@ class CLF_QP_Net(nn.Module):
                 *L_f_Vs, *L_g_Vs,
                 V.unsqueeze(-1),
                 self.u_nominal(x, **self.nominal_scenario),
-                solver_args={"max_iters": 5000000})
+                solver_args={"max_iters": 50000000})
             u = result[0]
             rs = result[1:]
         else:

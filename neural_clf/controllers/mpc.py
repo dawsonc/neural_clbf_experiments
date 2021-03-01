@@ -19,7 +19,7 @@ def PVTOLObsMPC(x_current, obs_pos, obs_r):
     # parameter settings
     N_obs = obs_pos.shape[0]
     assert obs_r.shape[0] == N_obs
-    T = 20  # planning horizon
+    T = 30  # planning horizon
     dt = 1/10.0
 
     # nominal model params
@@ -79,7 +79,7 @@ def PVTOLObsMPC(x_current, obs_pos, obs_r):
 
     # optimizer setting
     p_opts = {"expand": True}
-    s_opts = {"max_iter": 1000}
+    s_opts = {"max_iter": 10000}
     quiet = True
     if quiet:
         p_opts["print_time"] = 0
