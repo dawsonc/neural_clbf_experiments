@@ -205,26 +205,32 @@ with torch.no_grad():
     # ax1 = axs[0, 0]
     ax1 = axs
     ax1.plot([], c=rclbfqp_color, label="rCLBF-QP")
-    ax1.plot([], c=nclbf_color, label="rCLBF $\\pi_{proof}$")
+    ax1.plot([], c=nclbf_color, label="rCLBF $\\pi_{NN}$")
     ax1.plot([], c=sns.color_palette("pastel")[0], label="MPC")
     # ax1.plot([], c="g", label="Safe")
     # ax1.plot([], c="r", label="Unsafe")
+    min_trace, _ = (-x_sim_nclbf[:, :, StateIndex.PZ]).min(dim=1)
+    max_trace, _ = (-x_sim_nclbf[:, :, StateIndex.PZ]).max(dim=1)
     ax1.fill_between(
         t,
-        -x_sim_nclbf[:, 0, StateIndex.PZ],
-        -x_sim_nclbf[:, -1, StateIndex.PZ],
+        min_trace,
+        max_trace,
         color=nclbf_color,
         alpha=0.9)
+    min_trace, _ = (-x_sim_mpc[:, :, StateIndex.PZ]).min(dim=1)
+    max_trace, _ = (-x_sim_mpc[:, :, StateIndex.PZ]).max(dim=1)
     ax1.fill_between(
         t,
-        -x_sim_mpc[:, 0, StateIndex.PZ],
-        -x_sim_mpc[:, -1, StateIndex.PZ],
+        min_trace,
+        max_trace,
         color=mpc_color,
         alpha=0.9)
+    min_trace, _ = (-x_sim_rclbfqp[:t_final_rclbfqp, :, StateIndex.PZ]).min(dim=1)
+    max_trace, _ = (-x_sim_rclbfqp[:t_final_rclbfqp, :, StateIndex.PZ]).max(dim=1)
     ax1.fill_between(
         t[:t_final_rclbfqp],
-        -x_sim_rclbfqp[:t_final_rclbfqp, 0, StateIndex.PZ],
-        -x_sim_rclbfqp[:t_final_rclbfqp, -1, StateIndex.PZ],
+        min_trace,
+        max_trace,
         color=rclbfqp_color,
         alpha=0.9)
     ax1.plot(t, t * 0.0 - checkpoint["safe_z"], c="g")
@@ -237,36 +243,6 @@ with torch.no_grad():
     ax1.legend(loc="upper left")
     ax1.set_xlim([0, t_sim])
     ax1.set_ylim([-1, 9])
-
-    # ax3 = axs[1, 1]
-    # ax3.plot([], c=sns.color_palette("pastel")[0], label="MPC V")
-    # ax3.plot([], c=rclbfqp_color, label="rCLBF V")
-    # ax3.plot(t[1:], V_sim_mpc[1:, :, 0],
-    #          c=sns.color_palette("pastel")[0])
-    # ax3.plot(t[1:t_final_rclbfqp], V_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
-    #          c=rclbfqp_color)
-    # ax3.plot(t, t * 0.0, c="k")
-    # ax3.legend()
-
-    # ax2 = axs[0, 1]
-    # ax2.plot([], c=sns.color_palette("pastel")[0], label="mpc dV/dt")
-    # ax2.plot([], c=rclbfqp_color, label="rCLBF dV/dt")
-    # ax2.plot(t[1:t_final_rclbfqp], Vdot_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
-    #          c=rclbfqp_color)
-    # ax2.plot(t[1:], Vdot_sim_mpc[1:, :, 0],
-    #          c=sns.color_palette("pastel")[0])
-    # ax2.plot(t, t * 0.0, c="k")
-    # ax2.legend()
-
-    # ax4 = axs[1, 0]
-    # ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="mpc $f$")
-    # ax4.plot([], c=rclbfqp_color, linestyle="-", label="rCLBF $f$")
-    # ax4.plot()
-    # ax4.plot(t[1:t_final_rclbfqp], u_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
-    #          c=rclbfqp_color, linestyle="-")
-    # ax4.plot(t[1:], u_sim_mpc[1:, :, 0],
-    #          c=sns.color_palette("pastel")[0], linestyle="-")
-    # ax4.legend()
 
     fig.tight_layout()
     plt.show()

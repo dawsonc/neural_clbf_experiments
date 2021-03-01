@@ -53,7 +53,8 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
-                            nominal_scenario)
+                            nominal_scenario,
+                            use_casadi=True)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
 # robust_clf_net.use_QP = False
 
@@ -77,7 +78,7 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 2
+    N_sim = 10
     x_sim_start = torch.zeros(N_sim, n_dims) + 0.5
     x_sim_start[:, StateIndex.VZ] = -1
 
@@ -102,21 +103,22 @@ with torch.no_grad():
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
             x_current = x_sim_rclbfqp[tstep - 1, :, :]
-            # Get the control input at the current state
-            ts = time.time()
-            u, r, V, Vdot = robust_clf_net(x_current)
-            tf = time.time()
-            rclbf_runtime += tf - ts
-            rclbf_calls += 1
 
-            u_sim_rclbfqp[tstep, :, :] = u
-            V_sim_rclbfqp[tstep, :, 0] = V
-            Vdot_sim_rclbfqp[tstep, :, 0] = Vdot.squeeze()
+            # u_sim_rclbfqp[tstep, :, :] = u
+            # V_sim_rclbfqp[tstep, :, 0] = V
+            # Vdot_sim_rclbfqp[tstep, :, 0] = Vdot.squeeze()
             # Get the dynamics
             for i in range(N_sim):
+                # Get the control input at the current state
+                ts = time.time()
+                u, r, V, Vdot = robust_clf_net(x_current[i, :].unsqueeze(0))
+                tf = time.time()
+                rclbf_runtime += tf - ts
+                rclbf_calls += 1
+
                 f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0), mass=ms[i])
                 # Take one step to the future
-                xdot = f_val + g_val @ u[i, :]
+                xdot = f_val + (g_val @ u.T).squeeze()
                 x_sim_rclbfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclbfqp = tstep
@@ -131,6 +133,7 @@ with torch.no_grad():
     x_sim_nclbf[0, :, :] = x_sim_start
     t_final_nclbf = 0
     robust_clf_net.use_QP = False
+    robust_clf_net.use_casadi = False
     try:
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
@@ -206,31 +209,38 @@ with torch.no_grad():
     # ax1 = axs[0, 0]
     ax1 = axs
     ax1.plot([], c=rclbfqp_color, label="rCLBF-QP")
-    ax1.plot([], c=nclbf_color, label="rCLBF $\\pi_{proof}$")
+    ax1.plot([], c=nclbf_color, label="rCLBF $\\pi_{NN}$")
     ax1.plot([], c=sns.color_palette("pastel")[0], label="MPC")
     # ax1.plot([], c="g", label="Safe")
     # ax1.plot([], c="r", label="Unsafe")
+    min_trace, _ = x_sim_nclbf[:, :, StateIndex.PZ].min(dim=1)
+    max_trace, _ = x_sim_nclbf[:, :, StateIndex.PZ].max(dim=1)
     ax1.fill_between(
         t,
-        x_sim_nclbf[:, 0, StateIndex.PZ],
-        x_sim_nclbf[:, -1, StateIndex.PZ],
+        min_trace,
+        max_trace,
         color=nclbf_color,
         alpha=0.9)
+    min_trace, _ = x_sim_mpc[:, :, StateIndex.PZ].min(dim=1)
+    max_trace, _ = x_sim_mpc[:, :, StateIndex.PZ].max(dim=1)
     ax1.fill_between(
         t,
-        x_sim_mpc[:, 0, StateIndex.PZ],
-        x_sim_mpc[:, -1, StateIndex.PZ],
+        min_trace,
+        max_trace,
         color=mpc_color,
         alpha=0.9)
+    min_trace, _ = x_sim_rclbfqp[:t_final_rclbfqp, :, StateIndex.PZ].min(dim=1)
+    max_trace, _ = x_sim_rclbfqp[:t_final_rclbfqp, :, StateIndex.PZ].max(dim=1)
     ax1.fill_between(
         t[:t_final_rclbfqp],
-        x_sim_rclbfqp[:t_final_rclbfqp, 0, StateIndex.PZ],
-        x_sim_rclbfqp[:t_final_rclbfqp, -1, StateIndex.PZ],
+        min_trace,
+        max_trace,
         color=rclbfqp_color,
         alpha=0.9)
     ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
     # ax1.text(8, 0.1 + checkpoint["safe_z"], "Safe", fontsize=20)
-    ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
+    # ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
+    ax1.plot(t, t * 0.0 - 0.3, c="r")
     # ax1.text(8, -0.5 + checkpoint["unsafe_z"], "Unsafe", fontsize=20)
 
     ax1.set_xlabel("$t$")
@@ -238,52 +248,6 @@ with torch.no_grad():
     ax1.legend(loc="upper left")
     ax1.set_xlim([0, t_sim])
     ax1.set_ylim([-1, 2])
-
-    # fig, axs = plt.subplots(2, 2)
-    # t = np.linspace(0, t_sim, num_timesteps)
-    # ax1 = axs[0, 0]
-    # ax1.plot([], c=sns.color_palette("pastel")[1], label="rCLF")
-    # ax1.plot([], c=sns.color_palette("pastel")[0], label="mpc")
-    # ax1.plot(t[:t_final_rclbfqp], x_sim_rclbfqp[:t_final_rclbfqp, :, StateIndex.PZ],
-    #          c=sns.color_palette("pastel")[1])
-    # ax1.plot(t, x_sim_mpc[:, :, StateIndex.PZ], c=sns.color_palette("pastel")[0])
-    # ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
-    # ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
-
-    # ax1.set_xlabel("$t$")
-    # ax1.set_ylabel("$z$")
-    # ax1.legend()
-    # ax1.set_xlim([0, t_sim])
-
-    # ax3 = axs[1, 1]
-    # ax3.plot([], c=sns.color_palette("pastel")[0], label="mpc V")
-    # ax3.plot([], c=sns.color_palette("pastel")[1], label="rCLF V")
-    # ax3.plot(t[1:], V_sim_mpc[1:, :, 0],
-    #          c=sns.color_palette("pastel")[0])
-    # ax3.plot(t[1:t_final_rclbfqp], V_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
-    #          c=sns.color_palette("pastel")[1])
-    # ax3.plot(t, t * 0.0, c="k")
-    # ax3.legend()
-
-    # ax2 = axs[0, 1]
-    # ax2.plot([], c=sns.color_palette("pastel")[0], label="mpc dV/dt")
-    # ax2.plot([], c=sns.color_palette("pastel")[1], label="rCLF dV/dt")
-    # ax2.plot(t[1:t_final_rclbfqp], Vdot_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
-    #          c=sns.color_palette("pastel")[1])
-    # ax2.plot(t[1:], Vdot_sim_mpc[1:, :, 0],
-    #          c=sns.color_palette("pastel")[0])
-    # ax2.plot(t, t * 0.0, c="k")
-    # ax2.legend()
-
-    # ax4 = axs[1, 0]
-    # ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="mpc $a_z$")
-    # ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLF $a_z$")
-    # ax4.plot()
-    # ax4.plot(t[1:t_final_rclbfqp], u_sim_rclbfqp[1:t_final_rclbfqp, :, 2],
-    #          c=sns.color_palette("pastel")[1], linestyle="-")
-    # ax4.plot(t[1:], u_sim_mpc[1:, :, 2],
-    #          c=sns.color_palette("pastel")[0], linestyle="-")
-    # ax4.legend()
 
     fig.tight_layout()
     plt.show()

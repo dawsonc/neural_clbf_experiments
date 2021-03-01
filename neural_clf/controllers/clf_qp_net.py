@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import cvxpy as cp
 from cvxpylayers.torch import CvxpyLayer
+import casadi
 
 
 def d_tanh_dx(tanh):
@@ -17,7 +18,8 @@ class CLF_QP_Net(nn.Module):
 
     def __init__(self, n_input, n_hidden, n_controls, clf_lambda, clf_relaxation_penalty,
                  control_affine_dynamics, u_nominal, scenarios, nominal_scenario,
-                 G_u=torch.tensor([]), h_u=torch.tensor([])):
+                 G_u=torch.tensor([]), h_u=torch.tensor([]),
+                 use_casadi=False):
         """
         Initialize the network
 
@@ -71,6 +73,7 @@ class CLF_QP_Net(nn.Module):
 
         # Allow user to toggle QP on and off
         self.use_QP = True
+        self.use_casadi = use_casadi
 
         # To find the control input, we want to solve a QP, so we need to define the QP layer here
         # The decision variables are the control input and relaxation of the CLF condition for each
@@ -214,26 +217,51 @@ class CLF_QP_Net(nn.Module):
             L_g_Vs.append(torch.bmm(grad_V, g).squeeze(1))
 
         # To find the control input, we need to solve a QP
-        if self.use_QP and self.clf_relaxation_penalty < float('inf'):
-            result = self.qp_layer(
-                *L_f_Vs, *L_g_Vs,
-                V.unsqueeze(-1),
-                self.u_nominal(x, **self.nominal_scenario),
-                torch.tensor([self.clf_relaxation_penalty]),
-                solver_args={"max_iters": 50000000})
-            u = result[0]
-            rs = result[1:]
-        elif self.use_QP and self.clf_relaxation_penalty == float('inf'):
-            result = self.qp_layer(
-                *L_f_Vs, *L_g_Vs,
-                V.unsqueeze(-1),
-                self.u_nominal(x, **self.nominal_scenario),
-                solver_args={"max_iters": 50000000})
-            u = result[0]
-            rs = result[1:]
+        if not self.use_casadi:
+            if self.use_QP and self.clf_relaxation_penalty < float('inf'):
+                result = self.qp_layer(
+                    *L_f_Vs, *L_g_Vs,
+                    V.unsqueeze(-1),
+                    self.u_nominal(x, **self.nominal_scenario),
+                    torch.tensor([self.clf_relaxation_penalty]),
+                    solver_args={"max_iters": 50000000})
+                u = result[0]
+                rs = result[1:]
+            elif self.use_QP and self.clf_relaxation_penalty == float('inf'):
+                result = self.qp_layer(
+                    *L_f_Vs, *L_g_Vs,
+                    V.unsqueeze(-1),
+                    self.u_nominal(x, **self.nominal_scenario),
+                    solver_args={"max_iters": 50000000})
+                u = result[0]
+                rs = result[1:]
+            else:
+                rs = [torch.tensor([0.0])] * len(self.scenarios)
+                u = u_learned
         else:
-            rs = [torch.tensor([0.0])] * len(self.scenarios)
-            u = u_learned
+            opti = casadi.Opti()
+            u = opti.variable(self.n_controls)      # control (u1, u2)
+            gamma = opti.variable(1)
+
+            # Simple objective: actuator cost (relative to equilibrium) and terminal state cost
+            opti.minimize(casadi.sumsqr(u) + self.clf_relaxation_penalty * casadi.sumsqr(gamma))
+            for i in range(len(self.scenarios)):
+                # import pdb; pdb.set_trace()
+                opti.subject_to(L_f_Vs[i].squeeze().numpy().item()
+                                + L_g_Vs[i].squeeze().numpy().reshape((1, self.n_controls)) @ u
+                                + self.clf_lambda * V.numpy().item() <= gamma)
+            # optimizer setting
+            p_opts = {"expand": True}
+            s_opts = {"max_iter": 1000}
+            quiet = True
+            if quiet:
+                p_opts["print_time"] = 0
+                s_opts["print_level"] = 0
+                s_opts["sb"] = "yes"
+            opti.solver("ipopt", p_opts, s_opts)
+            sol1 = opti.solve()
+            u = torch.tensor(sol1.value(u)).unsqueeze(0)
+            rs = [torch.tensor([sol1.value(gamma)])] * len(self.scenarios)
 
         # Accumulate across scenarios
         n_scenarios = len(self.scenarios)

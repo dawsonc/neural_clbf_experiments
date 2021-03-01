@@ -99,31 +99,31 @@ with torch.no_grad():
     t_final_rclbfqp = 0
     rclbf_runtime = 0.0
     rclbf_calls = 0.0
-    try:
-        for tstep in tqdm(range(1, num_timesteps)):
-            # Get the current state
-            x_current = x_sim_rclbfqp[tstep - 1, :, :]
-            # Get the control input at the current state
-            ts = time.time()
-            u, r, V, Vdot = robust_clf_net(x_current)
-            tf = time.time()
-            rclbf_runtime += tf - ts
-            rclbf_calls += 1
+    for i in range(N_sim):
+        try:
+            for tstep in tqdm(range(1, num_timesteps)):
+                # Get the current state
+                x_current = x_sim_rclbfqp[tstep - 1, i, :]
+                # Get the control input at the current state
+                ts = time.time()
+                u, r, V, Vdot = robust_clf_net(x_current.unsqueeze(0))
+                tf = time.time()
+                rclbf_runtime += tf - ts
+                rclbf_calls += 1
 
-            u_sim_rclbfqp[tstep, :, :] = u
-            V_sim_rclbfqp[tstep, :, 0] = V
-            Vdot_sim_rclbfqp[tstep, :, 0] = Vdot.squeeze()
-            # Get the dynamics
-            for i in range(N_sim):
-                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0), m=ms[i])
+                # u_sim_rclbfqp[tstep, :, :] = u
+                # V_sim_rclbfqp[tstep, :, 0] = V
+                # Vdot_sim_rclbfqp[tstep, :, 0] = Vdot.squeeze()
+                # Get the dynamics
+                f_val, g_val = control_affine_dynamics(x_current.unsqueeze(0), m=ms[i])
                 # Take one step to the future
-                xdot = f_val + g_val @ u[i, :]
-                x_sim_rclbfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
+                xdot = f_val + (g_val @ u.T).squeeze()
+                x_sim_rclbfqp[tstep, i, :] = x_current + delta_t * xdot.squeeze()
 
-            t_final_rclbfqp = tstep
-    except (Exception, KeyboardInterrupt):
-        raise
-        print("Controller failed")
+                t_final_rclbfqp = tstep
+        except (Exception, KeyboardInterrupt):
+            raise
+            print("Controller failed")
 
     print("Simulating MPC controller...")
     x_sim_mpc = torch.zeros(num_timesteps, N_sim, n_dims)
