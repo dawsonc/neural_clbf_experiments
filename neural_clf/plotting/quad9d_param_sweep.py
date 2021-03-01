@@ -82,7 +82,7 @@ with torch.no_grad():
     x_sim_start = torch.zeros(N_sim, n_dims) + 1.0
     x_sim_start[:, StateIndex.PZ] = -1.0
 
-    t_sim = 1.5
+    t_sim = 10
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -181,9 +181,9 @@ with torch.no_grad():
     print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
     print(f"MPC safety failure rate: {mpc_failures / N_sim}")
 
-    rclbf_goal_error, _ = x_sim_rclbfqp[:, :, StateIndex.PZ].abs()[3000:, :].min()
-    mpc_goal_error, _ = x_sim_mpc[:, :, StateIndex.PZ].abs()[3000:, :].min()
-    rclbf_goal_error = rclbf_goal_error.mean()
-    mpc_goal_error = mpc_goal_error.mean()
-    print(f"rCLBF QP goal error: {rclbf_goal_error}")
-    print(f"MPC safety failure rate: {mpc_goal_error}")
+rclbf_goal_error, _ = x_sim_rclbfqp[:, :, StateIndex.PZ].abs()[1000:, :].min(dim=0)
+mpc_goal_error, _ = x_sim_mpc[:, :, StateIndex.PZ].abs()[1000:, :].min(dim=0)
+rclbf_goal_error = rclbf_goal_error.mean()
+mpc_goal_error = mpc_goal_error.mean()
+print(f"rCLBF QP goal error: {rclbf_goal_error}")
+print(f"MPC safety failure rate: {mpc_goal_error}")
