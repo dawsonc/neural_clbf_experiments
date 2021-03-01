@@ -62,18 +62,48 @@ robust_clf_net = CLF_QP_Net(n_dims,
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
 # robust_clf_net.use_QP = False
 
+
+# Also define the safe and unsafe regions
+def is_unsafe_check(x, z):
+    """Return the mask of x indicating safe regions"""
+    unsafe_mask = torch.zeros_like(x, dtype=torch.bool)
+
+    # We have a floor at z=-0.1 that we need to avoid
+    unsafe_z = -0.3
+    floor_mask = z <= unsafe_z
+    unsafe_mask.logical_or_(floor_mask)
+
+    # We also have a block obstacle to the left at ground level
+    obs1_min_x, obs1_max_x = (-1.0, -0.5)
+    obs1_min_z, obs1_max_z = (-0.4, 0.5)
+    obs1_mask_x = torch.logical_and(x >= obs1_min_x, x <= obs1_max_x)
+    obs1_mask_z = torch.logical_and(z >= obs1_min_z, z <= obs1_max_z)
+    obs1_mask = torch.logical_and(obs1_mask_x, obs1_mask_z)
+    unsafe_mask.logical_or_(obs1_mask)
+
+    # We also have a block obstacle to the right in the air
+    obs2_min_x, obs2_max_x = (0.05, 1.0)
+    obs2_min_z, obs2_max_z = (0.8, 1.35)
+    obs2_mask_x = torch.logical_and(x >= obs2_min_x, x <= obs2_max_x)
+    obs2_mask_z = torch.logical_and(z >= obs2_min_z, z <= obs2_max_z)
+    obs2_mask = torch.logical_and(obs2_mask_x, obs2_mask_z)
+    unsafe_mask.logical_or_(obs2_mask)
+
+    return torch.any(unsafe_mask)
+
+
 # Simulate some results
 with torch.no_grad():
-    N_sim = 1
+    N_sim = 2
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = -1.5
     x_sim_start[:, 1] = 0.1
 
     # Get a random distribution of masses and inertias
-    # ms = torch.linspace(low_m, low_m * 1.05, N_sim)
-    # inertias = torch.linspace(low_I, low_I * 1.05, N_sim)
-    ms = torch.linspace(1.05 * low_m, 1.05 * low_m, N_sim)
-    inertias = torch.linspace(1.0 * low_I, 1.0 * low_I, N_sim)
+    ms = torch.Tensor(N_sim, 1).uniform_(1.00 * low_m, 1.05 * low_m)
+    inertias = torch.Tensor(N_sim, 1).uniform_(1.0 * low_I, 1.05 * low_I)
+    # ms = torch.linspace(1.05 * low_m, 1.05 * low_m, N_sim)
+    # inertias = torch.linspace(1.0 * low_I, 1.0 * low_I, N_sim)
     # title_string = "$m=1.00$, $I=0.0100$"
     title_string = ""
 
@@ -116,6 +146,7 @@ with torch.no_grad():
                 x_sim_rclfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclfqp = tstep
+            1/0.0
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
@@ -132,25 +163,25 @@ with torch.no_grad():
     t_final_mpc = 0.0
     mpc_runtime = 0.0
     mpc_calls = 0.0
-    try:
-        for tstep in tqdm(range(1, num_timesteps)):
-            # Get the current state
-            x_current = x_sim_mpc[tstep - 1, :, :]
+    for i in range(N_sim):
+        try:
+            for tstep in tqdm(range(1, num_timesteps)):
+                # Get the current state
+                x_current = x_sim_mpc[tstep - 1, i, :]
 
-            # and measure the Lyapunov function value here
-            V, grad_V = robust_clf_net.compute_lyapunov(x_current)
+                # and measure the Lyapunov function value here
+                V, grad_V = robust_clf_net.compute_lyapunov(x_current.unsqueeze(0))
 
-            u_sim_mpc[tstep, :, :] = u
-            V_sim_mpc[tstep, :, 0] = V
-            # Get the dynamics
-            for i in range(N_sim):
-                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0),
+                u_sim_mpc[tstep, :, :] = u
+                V_sim_mpc[tstep, :, 0] = V
+                # Get the dynamics
+                f_val, g_val = control_affine_dynamics(x_current.unsqueeze(0),
                                                        m=ms[i],
                                                        inertia=inertias[i])
                 # Get the control input at the current state if we're at the appropriate timing
                 if tstep == 1 or tstep % mpc_update_frequency == 0:
                     ts = time.time()
-                    u = torch.tensor(PVTOLObsMPC(x_current[i, :].numpy(), obs_pos, obs_r))
+                    u = torch.tensor(PVTOLObsMPC(x_current.numpy(), obs_pos, obs_r))
                     tf = time.time()
                     mpc_runtime += tf - ts
                     mpc_calls += 1
@@ -162,50 +193,27 @@ with torch.no_grad():
                 # Take one step to the future
                 xdot = f_val + g_val @ u
                 Vdot_sim_mpc[tstep, :, 0] = (grad_V @ xdot.T).squeeze()
-                x_sim_mpc[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
-            t_final_mpc = tstep
-    except (Exception, KeyboardInterrupt):
-        print("Controller failed")
+                x_sim_mpc[tstep, i, :] = x_current + delta_t * xdot.squeeze()
+                t_final_mpc = tstep
+        except (Exception, KeyboardInterrupt):
+            # print("Controller failed")
+            raise
+            pass
 
     print(f"rCLBF qp total runtime = {rclbf_runtime} s ({rclbf_runtime / rclbf_calls} s per iteration)")
     print(f"MPC total runtime = {mpc_runtime} s ({mpc_runtime / mpc_calls} s per iteration)")
 
-    # fig, axs = plt.subplots(2, 2)
-    fig, axs = plt.subplots(1, 1)
-    t = np.linspace(0, t_sim, num_timesteps)
-    # ax1 = axs[0, 0]
-    ax1 = axs
-    ax1.plot([], c=rclfqp_color, label="rCLF-QP", linewidth=6)
-    ax1.plot([], c=mpc_color, label="MPC", linewidth=6)
-    ax1.plot(x_sim_rclfqp[:t_final_rclfqp, :, 0], x_sim_rclfqp[:t_final_rclfqp, :, 1],
-             c=rclfqp_color, linewidth=6)
-    ax1.plot(x_sim_mpc[:t_final_mpc, :, 0], x_sim_mpc[:t_final_mpc, :, 1], c=mpc_color, linewidth=6)
-    ax1.scatter([], [], label="Goal", s=1000, facecolors='none', edgecolors='k',
-                linestyle='--')
-    ax1.scatter([0.0], [0.0], s=10000, facecolors='none', edgecolors='k',
-                linestyle='--')
+    rclbf_failures = 0
+    mpc_failures = 0
+    for i in range(N_sim):
+        if is_unsafe_check(x_sim_rclfqp[:, i, 0], x_sim_rclfqp[:, i, 1]):
+            rclbf_failures += 1
+        if is_unsafe_check(x_sim_mpc[:, i, 0], x_sim_mpc[:, i, 1]):
+            mpc_failures += 1
+    print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
+    print(f"MPC safety failure rate: {mpc_failures / N_sim}")
 
-    # Add patches for unsafe region
-    obs1 = patches.Rectangle((-1.0, -0.4), 0.5, 0.9, linewidth=1,
-                             edgecolor='r', facecolor=obs_color, label="Unsafe Region")
-    obs2 = patches.Rectangle((0.0, 0.8), 1.0, 0.6, linewidth=1,
-                             edgecolor='r', facecolor=obs_color)
-    ground = patches.Rectangle((-4.0, -4.0), 8.0, 3.7, linewidth=1,
-                               edgecolor='r', facecolor=obs_color)
-    ax1.add_patch(obs1)
-    ax1.add_patch(obs2)
-    ax1.add_patch(ground)
-
-    ax1.set_xlabel("$x$")
-    ax1.set_ylabel("$z$")
-    ax1.set_title(title_string)
-    ax1.legend(fontsize=25, loc="upper left")
-    ax1.set_xlim([-2.0, 1.0])
-    ax1.set_ylim([-0.5, 1.5])
-
-    for item in ([ax1.title, ax1.xaxis.label, ax1.yaxis.label] +
-                 ax1.get_xticklabels() + ax1.get_yticklabels()):
-        item.set_fontsize(25)
-
-    fig.tight_layout()
-    plt.show()
+    rclbf_goal_error = x_sim_rclfqp.norm(dim=-1)[3000:, :].min()
+    mpc_goal_error = x_sim_mpc.norm(dim=-1)[3000:, :].min()
+    print(f"rCLBF QP goal error: {rclbf_goal_error}")
+    print(f"MPC safety failure rate: {mpc_goal_error}")

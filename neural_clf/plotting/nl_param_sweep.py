@@ -49,7 +49,7 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
                             0.1,  # checkpoint['clf_lambda'],
-                            5.0,  # checkpoint['relaxation_penalty'],
+                            7.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
@@ -179,3 +179,8 @@ with torch.no_grad():
             mpc_failures += 1
     print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
     print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+
+    rclbf_goal_error = x_sim_rclbfqp.norm(dim=-1)[3000:, :].mean()
+    mpc_goal_error = x_sim_mpc.norm(dim=-1)[3000:, :].mean()
+    print(f"rCLBF QP goal error: {rclbf_goal_error}")
+    print(f"MPC safety failure rate: {mpc_goal_error}")

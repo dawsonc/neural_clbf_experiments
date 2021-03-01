@@ -229,9 +229,9 @@ with torch.no_grad():
         color=rclbfqp_color,
         alpha=0.9)
     ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
-    ax1.text(8, 0.1 + checkpoint["safe_z"], "Safe", fontsize=20)
+    # ax1.text(8, 0.1 + checkpoint["safe_z"], "Safe", fontsize=20)
     ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
-    ax1.text(8, -0.5 + checkpoint["unsafe_z"], "Unsafe", fontsize=20)
+    # ax1.text(8, -0.5 + checkpoint["unsafe_z"], "Unsafe", fontsize=20)
 
     ax1.set_xlabel("$t$")
     ax1.set_ylabel("$z$")
