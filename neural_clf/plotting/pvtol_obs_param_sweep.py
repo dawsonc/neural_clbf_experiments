@@ -94,7 +94,7 @@ def is_unsafe_check(x, z):
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 2
+    N_sim = 100
     x_sim_start = torch.zeros(N_sim, n_dims)
     x_sim_start[:, 0] = -1.5
     x_sim_start[:, 1] = 0.1
@@ -137,7 +137,7 @@ with torch.no_grad():
                                                        m=ms[i],
                                                        inertia=inertias[i])
                 # Take one step to the future
-                xdot = f_val + g_val @ u[i, :]
+                xdot = f_val + g_val @ u[0, :]
                 x_sim_rclfqp[tstep, i, :] = x_current + delta_t * xdot.squeeze()
 
                 t_final_rclfqp = tstep
