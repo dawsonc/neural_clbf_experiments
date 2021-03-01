@@ -88,7 +88,7 @@ def control_affine_dynamics(x, m=m_low, **kwargs):
 
     x = [[x, z, theta, vx, vz, theta_dot]_1, ...]
     """
-    return f_func(x), g_func(x)
+    return f_func(x, m=m), g_func(x, m=m)
 
 
 # Linearize the system about the x = 0, u = [g, 0, 0, 0]

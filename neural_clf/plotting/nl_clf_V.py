@@ -24,7 +24,7 @@ checkpoint = torch.load(filename)
 nominal_scenario = {"mass": mass}
 scenarios = [
     {"mass": mass},
-    # {"m": m_high},
+    {"mass": mass * 1.1},
 ]
 clf_net = CLF_QP_Net(n_dims,
                      checkpoint['n_hidden'],

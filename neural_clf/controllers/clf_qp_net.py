@@ -220,7 +220,7 @@ class CLF_QP_Net(nn.Module):
                 V.unsqueeze(-1),
                 self.u_nominal(x, **self.nominal_scenario),
                 torch.tensor([self.clf_relaxation_penalty]),
-                solver_args={"max_iters": 5000000})
+                solver_args={"max_iters": 50000000})
             u = result[0]
             rs = result[1:]
         elif self.use_QP and self.clf_relaxation_penalty == float('inf'):
@@ -228,7 +228,7 @@ class CLF_QP_Net(nn.Module):
                 *L_f_Vs, *L_g_Vs,
                 V.unsqueeze(-1),
                 self.u_nominal(x, **self.nominal_scenario),
-                solver_args={"max_iters": 5000000})
+                solver_args={"max_iters": 50000000})
             u = result[0]
             rs = result[1:]
         else:
