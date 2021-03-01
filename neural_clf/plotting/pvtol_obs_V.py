@@ -76,7 +76,7 @@ def unsafe_mask_fn(grid_x, grid_z):
 
 
 with torch.no_grad():
-    n_grid = 500
+    n_grid = 1000
     x = torch.linspace(-2, 1, n_grid)
     z = torch.linspace(-0.5, 1.5, n_grid)
     grid_x, grid_z = torch.meshgrid(x, z)
