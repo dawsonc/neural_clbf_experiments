@@ -180,3 +180,10 @@ with torch.no_grad():
             mpc_failures += 1
     print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
     print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+
+    rclbf_goal_error, _ = x_sim_rclbfqp[:, :, StateIndex.PZ].abs()[3000:, :].min()
+    mpc_goal_error, _ = x_sim_mpc[:, :, StateIndex.PZ].abs()[3000:, :].min()
+    rclbf_goal_error = rclbf_goal_error.mean()
+    mpc_goal_error = mpc_goal_error.mean()
+    print(f"rCLBF QP goal error: {rclbf_goal_error}")
+    print(f"MPC safety failure rate: {mpc_goal_error}")
