@@ -77,7 +77,7 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 2
+    N_sim = 100
     x_sim_start = torch.zeros(N_sim, n_dims) + 0.5
     x_sim_start[:, StateIndex.VZ] = -1
 
