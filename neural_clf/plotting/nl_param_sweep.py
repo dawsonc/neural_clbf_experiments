@@ -49,7 +49,7 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
                             0.1,  # checkpoint['clf_lambda'],
-                            7.0,  # checkpoint['relaxation_penalty'],
+                            5.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
@@ -86,8 +86,7 @@ with torch.no_grad():
     num_timesteps = int(t_sim // delta_t)
 
     # Get a random distribution of masses and inertias
-    # ms = torch.Tensor(N_sim, 1).uniform_(mass, mass)
-    ms = torch.linspace(mass, 2.0, N_sim)
+    ms = torch.Tensor(N_sim, 1).uniform_(mass, 2.0)
 
     print("Simulating robust CLF QP controller...")
     x_sim_rclbfqp = torch.zeros(num_timesteps, N_sim, n_dims)
@@ -120,35 +119,6 @@ with torch.no_grad():
                 x_sim_rclbfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclbfqp = tstep
-    except (Exception, KeyboardInterrupt):
-        print("Controller failed")
-
-    print("Simulating robust CLF pi proof controller...")
-    x_sim_nclbf = torch.zeros(num_timesteps, N_sim, n_dims)
-    u_sim_nclbf = torch.zeros(num_timesteps, N_sim, n_controls)
-    V_sim_nclbf = torch.zeros(num_timesteps, N_sim, 1)
-    Vdot_sim_nclbf = torch.zeros(num_timesteps, N_sim, 1)
-    x_sim_nclbf[0, :, :] = x_sim_start
-    t_final_nclbf = 0
-    robust_clf_net.use_QP = False
-    try:
-        for tstep in tqdm(range(1, num_timesteps)):
-            # Get the current state
-            x_current = x_sim_nclbf[tstep - 1, :, :]
-            # Get the control input at the current state
-            u, r, V, Vdot = robust_clf_net(x_current)
-
-            u_sim_nclbf[tstep, :, :] = u
-            V_sim_nclbf[tstep, :, 0] = V
-            Vdot_sim_nclbf[tstep, :, 0] = Vdot.squeeze()
-            # Get the dynamics
-            for i in range(N_sim):
-                f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0), mass=ms[i])
-                # Take one step to the future
-                xdot = f_val + g_val @ u[i, :]
-                x_sim_nclbf[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
-
-            t_final_nclbf = tstep
     except (Exception, KeyboardInterrupt):
         print("Controller failed")
 
@@ -200,90 +170,12 @@ with torch.no_grad():
     print(f"rCLBF qp total runtime = {rclbf_runtime} s ({rclbf_runtime / rclbf_calls} s per iteration)")
     print(f"MPC total runtime = {mpc_runtime} s ({mpc_runtime / mpc_calls} s per iteration)")
 
-    # fig, axs = plt.subplots(2, 2)
-    fig, axs = plt.subplots(1, 1)
-    t = np.linspace(0, t_sim, num_timesteps)
-    # ax1 = axs[0, 0]
-    ax1 = axs
-    ax1.plot([], c=rclbfqp_color, label="rCLBF-QP")
-    ax1.plot([], c=nclbf_color, label="rCLBF $\\pi_{proof}$")
-    ax1.plot([], c=sns.color_palette("pastel")[0], label="MPC")
-    # ax1.plot([], c="g", label="Safe")
-    # ax1.plot([], c="r", label="Unsafe")
-    ax1.fill_between(
-        t,
-        x_sim_nclbf[:, 0, StateIndex.PZ],
-        x_sim_nclbf[:, -1, StateIndex.PZ],
-        color=nclbf_color,
-        alpha=0.9)
-    ax1.fill_between(
-        t,
-        x_sim_mpc[:, 0, StateIndex.PZ],
-        x_sim_mpc[:, -1, StateIndex.PZ],
-        color=mpc_color,
-        alpha=0.9)
-    ax1.fill_between(
-        t[:t_final_rclbfqp],
-        x_sim_rclbfqp[:t_final_rclbfqp, 0, StateIndex.PZ],
-        x_sim_rclbfqp[:t_final_rclbfqp, -1, StateIndex.PZ],
-        color=rclbfqp_color,
-        alpha=0.9)
-    ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
-    ax1.text(8, 0.1 + checkpoint["safe_z"], "Safe", fontsize=20)
-    ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
-    ax1.text(8, -0.5 + checkpoint["unsafe_z"], "Unsafe", fontsize=20)
-
-    ax1.set_xlabel("$t$")
-    ax1.set_ylabel("$z$")
-    ax1.legend(loc="upper left")
-    ax1.set_xlim([0, t_sim])
-    ax1.set_ylim([-1, 2])
-
-    # fig, axs = plt.subplots(2, 2)
-    # t = np.linspace(0, t_sim, num_timesteps)
-    # ax1 = axs[0, 0]
-    # ax1.plot([], c=sns.color_palette("pastel")[1], label="rCLF")
-    # ax1.plot([], c=sns.color_palette("pastel")[0], label="mpc")
-    # ax1.plot(t[:t_final_rclbfqp], x_sim_rclbfqp[:t_final_rclbfqp, :, StateIndex.PZ],
-    #          c=sns.color_palette("pastel")[1])
-    # ax1.plot(t, x_sim_mpc[:, :, StateIndex.PZ], c=sns.color_palette("pastel")[0])
-    # ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
-    # ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
-
-    # ax1.set_xlabel("$t$")
-    # ax1.set_ylabel("$z$")
-    # ax1.legend()
-    # ax1.set_xlim([0, t_sim])
-
-    # ax3 = axs[1, 1]
-    # ax3.plot([], c=sns.color_palette("pastel")[0], label="mpc V")
-    # ax3.plot([], c=sns.color_palette("pastel")[1], label="rCLF V")
-    # ax3.plot(t[1:], V_sim_mpc[1:, :, 0],
-    #          c=sns.color_palette("pastel")[0])
-    # ax3.plot(t[1:t_final_rclbfqp], V_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
-    #          c=sns.color_palette("pastel")[1])
-    # ax3.plot(t, t * 0.0, c="k")
-    # ax3.legend()
-
-    # ax2 = axs[0, 1]
-    # ax2.plot([], c=sns.color_palette("pastel")[0], label="mpc dV/dt")
-    # ax2.plot([], c=sns.color_palette("pastel")[1], label="rCLF dV/dt")
-    # ax2.plot(t[1:t_final_rclbfqp], Vdot_sim_rclbfqp[1:t_final_rclbfqp, :, 0],
-    #          c=sns.color_palette("pastel")[1])
-    # ax2.plot(t[1:], Vdot_sim_mpc[1:, :, 0],
-    #          c=sns.color_palette("pastel")[0])
-    # ax2.plot(t, t * 0.0, c="k")
-    # ax2.legend()
-
-    # ax4 = axs[1, 0]
-    # ax4.plot([], c=sns.color_palette("pastel")[0], linestyle="-", label="mpc $a_z$")
-    # ax4.plot([], c=sns.color_palette("pastel")[1], linestyle="-", label="rCLF $a_z$")
-    # ax4.plot()
-    # ax4.plot(t[1:t_final_rclbfqp], u_sim_rclbfqp[1:t_final_rclbfqp, :, 2],
-    #          c=sns.color_palette("pastel")[1], linestyle="-")
-    # ax4.plot(t[1:], u_sim_mpc[1:, :, 2],
-    #          c=sns.color_palette("pastel")[0], linestyle="-")
-    # ax4.legend()
-
-    fig.tight_layout()
-    plt.show()
+    rclbf_failures = 0
+    mpc_failures = 0
+    for i in range(N_sim):
+        if torch.any(x_sim_rclbfqp[:, i, StateIndex.PZ] <= checkpoint["unsafe_z"]):
+            rclbf_failures += 1
+        if torch.any(x_sim_mpc[:, i, StateIndex.PZ] <= checkpoint["unsafe_z"]):
+            mpc_failures += 1
+    print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
+    print(f"MPC safety failure rate: {mpc_failures / N_sim}")
