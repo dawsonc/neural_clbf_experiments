@@ -58,7 +58,8 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
-                            nominal_scenario)
+                            nominal_scenario,
+                            use_casadi=True)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
 # robust_clf_net.use_QP = False
 
@@ -107,7 +108,7 @@ with torch.no_grad():
     # title_string = "$m=1.00$, $I=0.0100$"
     title_string = ""
 
-    t_sim = 7.0
+    t_sim = 5.0
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 

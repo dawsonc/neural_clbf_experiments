@@ -78,7 +78,7 @@ with torch.no_grad():
     # title_string = "$m=1.00$, $I=0.0100$"
     title_string = ""
 
-    t_sim = 7.0
+    t_sim = 5.0
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
