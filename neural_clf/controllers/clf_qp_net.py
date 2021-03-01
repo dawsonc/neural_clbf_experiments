@@ -244,7 +244,9 @@ class CLF_QP_Net(nn.Module):
             gamma = opti.variable(1)
 
             # Simple objective: actuator cost (relative to equilibrium) and terminal state cost
-            opti.minimize(casadi.sumsqr(u) + self.clf_relaxation_penalty * casadi.sumsqr(gamma))
+            opti.minimize(
+                casadi.sumsqr(u - self.u_nominal(x, **self.nominal_scenario).squeeze().numpy())
+                + self.clf_relaxation_penalty * casadi.sumsqr(gamma))
             for i in range(len(self.scenarios)):
                 # import pdb; pdb.set_trace()
                 opti.subject_to(L_f_Vs[i].squeeze().numpy().item()

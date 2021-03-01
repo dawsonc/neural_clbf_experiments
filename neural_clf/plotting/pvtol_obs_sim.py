@@ -58,7 +58,8 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
-                            nominal_scenario)
+                            nominal_scenario,
+                            use_casadi=True)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
 # robust_clf_net.use_QP = False
 
