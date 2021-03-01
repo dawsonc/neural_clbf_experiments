@@ -53,7 +53,8 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
-                            nominal_scenario)
+                            nominal_scenario,
+                            use_casadi=True)
 robust_clf_net.load_state_dict(checkpoint['clf_net'])
 # robust_clf_net.use_QP = False
 
@@ -101,21 +102,22 @@ with torch.no_grad():
         for tstep in tqdm(range(1, num_timesteps)):
             # Get the current state
             x_current = x_sim_rclbfqp[tstep - 1, :, :]
-            # Get the control input at the current state
-            ts = time.time()
-            u, r, V, Vdot = robust_clf_net(x_current)
-            tf = time.time()
-            rclbf_runtime += tf - ts
-            rclbf_calls += 1
 
-            u_sim_rclbfqp[tstep, :, :] = u
-            V_sim_rclbfqp[tstep, :, 0] = V
-            Vdot_sim_rclbfqp[tstep, :, 0] = Vdot.squeeze()
+            # u_sim_rclbfqp[tstep, :, :] = u
+            # V_sim_rclbfqp[tstep, :, 0] = V
+            # Vdot_sim_rclbfqp[tstep, :, 0] = Vdot.squeeze()
             # Get the dynamics
             for i in range(N_sim):
+                # Get the control input at the current state
+                ts = time.time()
+                u, r, V, Vdot = robust_clf_net(x_current[i, :].unsqueeze(0))
+                tf = time.time()
+                rclbf_runtime += tf - ts
+                rclbf_calls += 1
+
                 f_val, g_val = control_affine_dynamics(x_current[i, :].unsqueeze(0), mass=ms[i])
                 # Take one step to the future
-                xdot = f_val + g_val @ u[i, :]
+                xdot = f_val + (g_val @ u.T).squeeze()
                 x_sim_rclbfqp[tstep, i, :] = x_current[i, :] + delta_t * xdot.squeeze()
 
             t_final_rclbfqp = tstep

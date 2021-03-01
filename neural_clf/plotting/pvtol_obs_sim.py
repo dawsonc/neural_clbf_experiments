@@ -3,6 +3,7 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.animation import FuncAnimation
 import seaborn as sns
 import time
 
@@ -53,7 +54,7 @@ scenarios = [
 robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
-                            7.0,  # checkpoint['clf_lambda'],
+                            6.0,  # checkpoint['clf_lambda'],
                             1100.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
@@ -74,7 +75,7 @@ with torch.no_grad():
     # ms = torch.linspace(low_m, low_m * 1.05, N_sim)
     # inertias = torch.linspace(low_I, low_I * 1.05, N_sim)
     ms = torch.linspace(1.05 * low_m, 1.05 * low_m, N_sim)
-    inertias = torch.linspace(1.0 * low_I, 1.0 * low_I, N_sim)
+    inertias = torch.linspace(1.05 * low_I, 1.05 * low_I, N_sim)
     # title_string = "$m=1.00$, $I=0.0100$"
     title_string = ""
 
@@ -210,3 +211,45 @@ with torch.no_grad():
 
     fig.tight_layout()
     plt.show()
+
+    # Animate the neural controller
+    fig, ax = plt.subplots(figsize=(6, 5))
+    # Add patches for unsafe region
+    obs1 = patches.Rectangle((-1.0, -0.4), 0.5, 0.9, linewidth=1,
+                             edgecolor='r', facecolor=obs_color, label="Unsafe Region")
+    obs2 = patches.Rectangle((0.0, 0.8), 1.0, 0.6, linewidth=1,
+                             edgecolor='r', facecolor=obs_color)
+    ground = patches.Rectangle((-4.0, -4.0), 8.0, 3.7, linewidth=1,
+                               edgecolor='r', facecolor=obs_color)
+    ax.add_patch(obs1)
+    ax.add_patch(obs2)
+    ax.add_patch(ground)
+
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$z$")
+    ax.set_xlim([-2.0, 1.0])
+    ax.set_ylim([-0.5, 1.5])
+
+    quad_clf = patches.Rectangle((0.0, 0.0), 0.1, 0.05, linewidth=1,
+                                 facecolor=rclfqp_color, edgecolor=rclfqp_color, label="rCLBF")
+    ax.add_patch(quad_clf)
+    quad_mpc = patches.Rectangle((0.0, 0.0), 0.1, 0.05, linewidth=1,
+                                 facecolor=mpc_color, edgecolor=mpc_color, label="MPC")
+    ax.add_patch(quad_mpc)
+    ax.legend(fontsize=25, loc="upper left")
+
+    def animate(i):
+        # i is the frame. At 30 fps, t = i/30
+        t_index = int((i / 30) / delta_t)
+        t_index_rclfqp = min(t_index, t_final_rclfqp)
+        t_index_mpc = min(t_index, t_final_mpc)
+        quad_clf.set_xy([x_sim_rclfqp[t_index_rclfqp, 0, 0], x_sim_rclfqp[t_index_rclfqp, 0, 1]])
+        quad_clf._angle = -np.rad2deg(x_sim_rclfqp[t_index_rclfqp, 0, 2])
+        quad_mpc.set_xy([x_sim_mpc[t_index_mpc, 0, 0], x_sim_mpc[t_index_mpc, 0, 1]])
+        quad_mpc._angle = -np.rad2deg(x_sim_mpc[t_index_mpc, 0, 2])
+        return quad_clf, quad_mpc,
+
+    anim = FuncAnimation(fig, animate, interval=1000/30, frames=5 * 30)
+
+    plt.show(); plt.draw()
+    # anim.save('logs/plots/pvtol/pvtol_obs_high.mov')

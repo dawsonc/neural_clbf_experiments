@@ -79,7 +79,7 @@ def PVTOLObsMPC(x_current, obs_pos, obs_r):
 
     # optimizer setting
     p_opts = {"expand": True}
-    s_opts = {"max_iter": 10000}
+    s_opts = {"max_iter": 1000}
     quiet = True
     if quiet:
         p_opts["print_time"] = 0
