@@ -50,7 +50,7 @@ robust_clf_net = CLF_QP_Net(n_dims,
                             checkpoint['n_hidden'],
                             n_controls,
                             1.0,  # checkpoint['clf_lambda'],
-                            float('inf'),  # checkpoint['relaxation_penalty'],
+                            1000.0,  # checkpoint['relaxation_penalty'],
                             control_affine_dynamics,
                             u_nominal,
                             scenarios,
@@ -79,7 +79,7 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 
 # Simulate some results
 with torch.no_grad():
-    N_sim = 100
+    N_sim = 1
     x_sim_start = torch.zeros(N_sim, n_dims) + 1.0
     x_sim_start[:, StateIndex.PZ] = -1.0
 
