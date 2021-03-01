@@ -170,18 +170,20 @@ with torch.no_grad():
     print(f"rCLBF qp total runtime = {rclbf_runtime} s ({rclbf_runtime / rclbf_calls} s per iteration)")
     print(f"MPC total runtime = {mpc_runtime} s ({mpc_runtime / mpc_calls} s per iteration)")
 
-    rclbf_failures = 0
-    mpc_failures = 0
-    for i in range(N_sim):
-        if torch.any(x_sim_rclbfqp[:, i, StateIndex.PZ] <= checkpoint["unsafe_z"]):
-            rclbf_failures += 1
-        if torch.any(x_sim_mpc[:, i, StateIndex.PZ] <= checkpoint["unsafe_z"]):
-            mpc_failures += 1
-    print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
-    print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+rclbf_failures = 0
+mpc_failures = 0
+safe_level = -0.3  # checkpoint["unsafe_z"]
+for i in range(N_sim):
+    if torch.any(x_sim_rclbfqp[:, i, StateIndex.PZ] <= safe_level):
+        rclbf_failures += 1
+    if torch.any(x_sim_mpc[:, i, StateIndex.PZ] <= safe_level):
+        mpc_failures += 1
 
-    rclbf_goal_error, _ = x_sim_rclbfqp[:, :, StateIndex.PZ].abs()[3000:, :].min()
-    mpc_goal_error, _ = x_sim_mpc[:, :, StateIndex.PZ].abs()[3000:, :].min()
+print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
+print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+
+    rclbf_goal_error, _ = x_sim_rclbfqp[:, :, StateIndex.PZ].abs()[3000:, :].min(dim=0)
+    mpc_goal_error, _ = x_sim_mpc[:, :, StateIndex.PZ].abs()[3000:, :].min(dim=0)
     rclbf_goal_error = rclbf_goal_error.mean()
     mpc_goal_error = mpc_goal_error.mean()
     print(f"rCLBF QP goal error: {rclbf_goal_error}")

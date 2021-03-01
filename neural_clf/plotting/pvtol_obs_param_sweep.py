@@ -67,29 +67,29 @@ robust_clf_net.load_state_dict(checkpoint['clf_net'])
 def is_unsafe_check(x, z):
     """Return the mask of x indicating safe regions"""
     unsafe_mask = torch.zeros_like(x, dtype=torch.bool)
-
     # We have a floor at z=-0.1 that we need to avoid
     unsafe_z = -0.3
     floor_mask = z <= unsafe_z
     unsafe_mask.logical_or_(floor_mask)
-
     # We also have a block obstacle to the left at ground level
     obs1_min_x, obs1_max_x = (-1.0, -0.5)
     obs1_min_z, obs1_max_z = (-0.4, 0.5)
+    obs1_min_x, obs1_max_x = (-0.9, -0.6)
+    obs1_min_z, obs1_max_z = (-0.4, 0.4)
     obs1_mask_x = torch.logical_and(x >= obs1_min_x, x <= obs1_max_x)
     obs1_mask_z = torch.logical_and(z >= obs1_min_z, z <= obs1_max_z)
     obs1_mask = torch.logical_and(obs1_mask_x, obs1_mask_z)
     unsafe_mask.logical_or_(obs1_mask)
-
     # We also have a block obstacle to the right in the air
     obs2_min_x, obs2_max_x = (0.05, 1.0)
     obs2_min_z, obs2_max_z = (0.8, 1.35)
+    obs2_min_x, obs2_max_x = (0.15, 0.9)
+    obs2_min_z, obs2_max_z = (0.9, 1.25)
     obs2_mask_x = torch.logical_and(x >= obs2_min_x, x <= obs2_max_x)
     obs2_mask_z = torch.logical_and(z >= obs2_min_z, z <= obs2_max_z)
     obs2_mask = torch.logical_and(obs2_mask_x, obs2_mask_z)
     unsafe_mask.logical_or_(obs2_mask)
-
-    return torch.any(unsafe_mask)
+    return unsafe_mask
 
 
 # Simulate some results
@@ -197,19 +197,38 @@ with torch.no_grad():
     print(f"rCLBF qp total runtime = {rclbf_runtime} s ({rclbf_runtime / rclbf_calls} s per iteration)")
     print(f"MPC total runtime = {mpc_runtime} s ({mpc_runtime / mpc_calls} s per iteration)")
 
-    rclbf_failures = 0
-    mpc_failures = 0
-    for i in range(N_sim):
-        if is_unsafe_check(x_sim_rclfqp[:, i, 0], x_sim_rclfqp[:, i, 1]):
-            rclbf_failures += 1
-        if is_unsafe_check(x_sim_mpc[:, i, 0], x_sim_mpc[:, i, 1]):
-            mpc_failures += 1
-    print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
-    print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+rclbf_failures = 0
+mpc_failures = 0
+rclbf_reached = 0
+mpc_reached = 0
+for i in range(N_sim):
+    max_t_rclbf = num_timesteps
+    max_t_mpc = num_timesteps
+    mpc_failed = False
+    if torch.any(x_sim_rclfqp[:, i, :2].norm(dim=-1) <= 0.25, dim=0):
+        rclbf_reached += 1
+        max_t_rclbf = torch.nonzero(x_sim_rclfqp[:, i, :2].norm(dim=-1) <= 0.25).min()
+    if torch.any(is_unsafe_check(x_sim_rclfqp[:max_t_rclbf, i, 0], x_sim_rclfqp[:max_t_rclbf, i, 1])):
+        rclbf_failures += 1
+    if torch.any(x_sim_mpc[:, i, :2].norm(dim=-1) <= 0.25, dim=0):
+        reached_idx = torch.nonzero(x_sim_mpc[:, i, :2].norm(dim=-1) <= 0.25).min()
+        xnorm = x_sim_mpc[:, i, :2].norm(dim=-1)
+        if torch.abs(xnorm[reached_idx-1] - xnorm[reached_idx]) <= 0.1:
+            mpc_reached += 1
+            max_t_mpc = reached_idx
+    if torch.any(is_unsafe_check(x_sim_mpc[:max_t_mpc, i, 0], x_sim_mpc[:max_t_mpc, i, 1])):
+        mpc_failures += 1
+    elif np.abs(np.diff(x_sim_mpc[:, i, :2].norm(dim=-1).numpy())).max() >= 0.1:
+        mpc_failures += 1
 
-    rclbf_goal_error, _ = x_sim_rclfqp.norm(dim=-1)[3000:, :].min()
-    mpc_goal_error, _ = x_sim_mpc.norm(dim=-1)[3000:, :].min()
-    rclbf_goal_error = rclbf_goal_error.mean()
-    mpc_goal_error = mpc_goal_error.mean()
-    print(f"rCLBF QP goal error: {rclbf_goal_error}")
-    print(f"MPC safety failure rate: {mpc_goal_error}")
+print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
+print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+print(f"rCLBF QP reach rate: {rclbf_reached / N_sim}")
+print(f"MPC reach rate: {mpc_reached / N_sim}")
+
+rclbf_goal_error, _ = x_sim_rclfqp.norm(dim=-1)[3000:, :].min()
+mpc_goal_error, _ = x_sim_mpc.norm(dim=-1)[3000:, :].min()
+rclbf_goal_error = rclbf_goal_error.mean()
+mpc_goal_error = mpc_goal_error.mean()
+print(f"rCLBF QP goal error: {rclbf_goal_error}")
+print(f"MPC safety failure rate: {mpc_goal_error}")
