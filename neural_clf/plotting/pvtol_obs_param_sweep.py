@@ -73,8 +73,8 @@ def is_unsafe_check(x, z):
     floor_mask = z <= unsafe_z
     unsafe_mask.logical_or_(floor_mask)
     # We also have a block obstacle to the left at ground level
-    obs1_min_x, obs1_max_x = (-1.0, -0.5)
-    obs1_min_z, obs1_max_z = (-0.4, 0.5)
+    # obs1_min_x, obs1_max_x = (-1.0, -0.5)
+    # obs1_min_z, obs1_max_z = (-0.4, 0.5)
     obs1_min_x, obs1_max_x = (-0.9, -0.6)
     obs1_min_z, obs1_max_z = (-0.4, 0.4)
     obs1_mask_x = torch.logical_and(x >= obs1_min_x, x <= obs1_max_x)
@@ -82,8 +82,8 @@ def is_unsafe_check(x, z):
     obs1_mask = torch.logical_and(obs1_mask_x, obs1_mask_z)
     unsafe_mask.logical_or_(obs1_mask)
     # We also have a block obstacle to the right in the air
-    obs2_min_x, obs2_max_x = (0.05, 1.0)
-    obs2_min_z, obs2_max_z = (0.8, 1.35)
+    # obs2_min_x, obs2_max_x = (0.05, 1.0)
+    # obs2_min_z, obs2_max_z = (0.8, 1.35)
     obs2_min_x, obs2_max_x = (0.15, 0.9)
     obs2_min_z, obs2_max_z = (0.9, 1.25)
     obs2_mask_x = torch.logical_and(x >= obs2_min_x, x <= obs2_max_x)
@@ -91,6 +91,20 @@ def is_unsafe_check(x, z):
     obs2_mask = torch.logical_and(obs2_mask_x, obs2_mask_z)
     unsafe_mask.logical_or_(obs2_mask)
     return unsafe_mask
+
+
+def min_dist(xz):
+    obs1_pos = np.array([-0.75, 0.25])
+    obs2_pos = np.array([0.0, 1.1])
+    obs_r = 0.3
+    dist_2_obs1 = (xz - obs1_pos).norm(dim=-1)
+    dist_2_obs2 = (xz - obs2_pos).norm(dim=-1)
+    min_dist = min(dist_2_obs1.min(), dist_2_obs2.min())
+    return min_dist
+
+
+def goal_check(xz):
+    return xz.norm(dim=-1) <= 0.3
 
 
 # Simulate some results
@@ -108,7 +122,7 @@ with torch.no_grad():
     # title_string = "$m=1.00$, $I=0.0100$"
     title_string = ""
 
-    t_sim = 5.0
+    t_sim = 8.0
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -122,6 +136,7 @@ with torch.no_grad():
     t_final_rclfqp = 0
     rclbf_runtime = 0.0
     rclbf_calls = 0.0
+    num_rclbf_successes = 0
     for i in range(N_sim):
         try:
             for tstep in tqdm(range(1, num_timesteps)):
@@ -142,6 +157,15 @@ with torch.no_grad():
                 x_sim_rclfqp[tstep, i, :] = x_current + delta_t * xdot.squeeze()
 
                 t_final_rclfqp = tstep
+
+                if is_unsafe_check(x_sim_rclfqp[tstep, i, 0], x_sim_rclfqp[tstep, i, 1]):
+                    print("unsafe")
+                    break
+                if goal_check(x_sim_rclfqp[tstep, i, :2]):
+                    print("goal")
+                    break
+            if goal_check(x_sim_rclfqp[tstep, i, :2]):
+                num_rclbf_successes += 1
         except (Exception, KeyboardInterrupt):
             print("Controller failed")
             pass
@@ -159,6 +183,7 @@ with torch.no_grad():
     t_final_mpc = 0.0
     mpc_runtime = 0.0
     mpc_calls = 0.0
+    num_mpc_successes = 0
     for i in range(N_sim):
         try:
             for tstep in tqdm(range(1, num_timesteps)):
@@ -191,6 +216,14 @@ with torch.no_grad():
                 Vdot_sim_mpc[tstep, :, 0] = (grad_V @ xdot.T).squeeze()
                 x_sim_mpc[tstep, i, :] = x_current + delta_t * xdot.squeeze()
                 t_final_mpc = tstep
+                if is_unsafe_check(x_sim_mpc[tstep, i, 0], x_sim_mpc[tstep, i, 1]):
+                    print("unsafe")
+                    break
+                if goal_check(x_sim_mpc[tstep, i, :2]):
+                    print("goal")
+                    break
+            if goal_check(x_sim_mpc[tstep, i, :2]):
+                num_mpc_successes += 1
         except (Exception, KeyboardInterrupt):
             # print("Controller failed")
             pass
@@ -198,38 +231,70 @@ with torch.no_grad():
     print(f"rCLBF qp total runtime = {rclbf_runtime} s ({rclbf_runtime / rclbf_calls} s per iteration)")
     print(f"MPC total runtime = {mpc_runtime} s ({mpc_runtime / mpc_calls} s per iteration)")
 
-rclbf_failures = 0
-mpc_failures = 0
-rclbf_reached = 0
-mpc_reached = 0
-for i in range(N_sim):
-    max_t_rclbf = num_timesteps
-    max_t_mpc = num_timesteps
-    mpc_failed = False
-    if torch.any(x_sim_rclfqp[:, i, :2].norm(dim=-1) <= 0.25, dim=0):
-        rclbf_reached += 1
-        max_t_rclbf = torch.nonzero(x_sim_rclfqp[:, i, :2].norm(dim=-1) <= 0.25).min()
-    if torch.any(is_unsafe_check(x_sim_rclfqp[:max_t_rclbf, i, 0], x_sim_rclfqp[:max_t_rclbf, i, 1])):
-        rclbf_failures += 1
-    if torch.any(x_sim_mpc[:, i, :2].norm(dim=-1) <= 0.25, dim=0):
-        reached_idx = torch.nonzero(x_sim_mpc[:, i, :2].norm(dim=-1) <= 0.25).min()
-        xnorm = x_sim_mpc[:, i, :2].norm(dim=-1)
-        if torch.abs(xnorm[reached_idx-1] - xnorm[reached_idx]) <= 0.1:
-            mpc_reached += 1
-            max_t_mpc = reached_idx
-    if torch.any(is_unsafe_check(x_sim_mpc[:max_t_mpc, i, 0], x_sim_mpc[:max_t_mpc, i, 1])):
-        mpc_failures += 1
-    elif np.abs(np.diff(x_sim_mpc[:, i, :2].norm(dim=-1).numpy())).max() >= 0.1:
-        mpc_failures += 1
+    print(f"rCLBF successes {num_rclbf_successes}")
+    print(f"MPC successes {num_mpc_successes}")
 
-print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
-print(f"MPC safety failure rate: {mpc_failures / N_sim}")
-print(f"rCLBF QP reach rate: {rclbf_reached / N_sim}")
-print(f"MPC reach rate: {mpc_reached / N_sim}")
+# rclbf_failures = 0
+# mpc_failures = 0
+# rclbf_reached = 0
+# mpc_reached = 0
+# for i in range(N_sim):
+#     max_t_rclbf = num_timesteps
+#     max_t_mpc = num_timesteps
+#     mpc_failed = False
+#     min_norm_rclfqp = x_sim_rclfqp[:, i, :2].norm(dim=-1).min()
+#     min_norm_mpc = x_sim_rclfqp[:, i, :2].norm(dim=-1).min()
+#     rad = 0.5
+#     if min_norm_rclfqp <= rad:
+#         rclbf_reached += 1
+#         max_t_rclbf = torch.nonzero(x_sim_rclfqp[:, i, :2].norm(dim=-1) <= 0.5).min()
+#     if torch.any(is_unsafe_check(x_sim_rclfqp[:max_t_rclbf, i, 0], x_sim_rclfqp[:max_t_rclbf, i, 1])):
+#         rclbf_failures += 1
+#     if min_norm_mpc <= rad:
+#         reached_idx = torch.nonzero(x_sim_mpc[:, i, :2].norm(dim=-1) <= 0.5).min()
+#         xnorm = x_sim_mpc[:, i, :2].norm(dim=-1)
+#         if torch.abs(xnorm[reached_idx-1] - xnorm[reached_idx]) <= 0.1:
+#             mpc_reached += 1
+#             max_t_mpc = reached_idx
+#     if torch.any(is_unsafe_check(x_sim_mpc[:max_t_mpc, i, 0], x_sim_mpc[:max_t_mpc, i, 1])):
+#         mpc_failures += 1
+#     elif np.abs(np.diff(x_sim_mpc[:, i, :2].norm(dim=-1).numpy())).max() >= 0.1:
+#         mpc_failures += 1
 
-rclbf_goal_error, _ = x_sim_rclfqp.norm(dim=-1)[3000:, :].min()
-mpc_goal_error, _ = x_sim_mpc.norm(dim=-1)[3000:, :].min()
-rclbf_goal_error = rclbf_goal_error.mean()
-mpc_goal_error = mpc_goal_error.mean()
-print(f"rCLBF QP goal error: {rclbf_goal_error}")
-print(f"MPC safety failure rate: {mpc_goal_error}")
+# print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
+# print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+# print(f"rCLBF QP reach rate: {rclbf_reached / N_sim}")
+# print(f"MPC reach rate: {mpc_reached / N_sim}")
+
+    rclbf_failures = 0
+    mpc_failures = 0
+    rclbf_reached = 0
+    mpc_reached = 0
+    for i in range(N_sim):
+        max_t_rclbf = num_timesteps
+        max_t_mpc = num_timesteps
+        min_norm_rclfqp = x_sim_rclfqp[:, i, :2].norm(dim=-1).min()
+        min_norm_mpc = x_sim_mpc[:, i, :2].norm(dim=-1).min()
+        max_diff_mpc = np.abs(np.diff(x_sim_mpc[:, i, :2].norm(dim=-1).numpy())).max()
+        rad = 0.3
+        obs_rad = 0.1
+        if min_norm_rclfqp <= rad:
+            max_t_rclbf = torch.nonzero(x_sim_rclfqp[:, i, :2].norm(dim=-1) <= rad).min()
+            if min_dist(x_sim_rclfqp[:max_t_rclbf, i, :2]) >= obs_rad:
+                rclbf_reached += 1
+        if min_norm_mpc <= rad and max_diff_mpc <= 0.1:
+            max_t_mpc = torch.nonzero(x_sim_mpc[:, i, :2].norm(dim=-1) <= rad).min()
+            if min_dist(x_sim_mpc[:max_t_mpc, i, :2]) >= obs_rad:
+                mpc_reached += 1
+
+    # print(f"rCLBF QP safety failure rate: {rclbf_failures / N_sim}")
+    # print(f"MPC safety failure rate: {mpc_failures / N_sim}")
+    print(f"rCLBF QP reach rate: {rclbf_reached / N_sim}")
+    print(f"MPC reach rate: {mpc_reached / N_sim}")
+
+    rclbf_goal_error, _ = x_sim_rclfqp.norm(dim=-1)[3000:, :].min()
+    mpc_goal_error, _ = x_sim_mpc.norm(dim=-1)[3000:, :].min()
+    rclbf_goal_error = rclbf_goal_error.mean()
+    mpc_goal_error = mpc_goal_error.mean()
+    print(f"rCLBF QP goal error: {rclbf_goal_error}")
+    print(f"MPC safety failure rate: {mpc_goal_error}")

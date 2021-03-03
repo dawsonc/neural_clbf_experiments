@@ -82,7 +82,7 @@ with torch.no_grad():
     x_sim_start = torch.zeros(N_sim, n_dims) + 0.5
     x_sim_start[:, StateIndex.VZ] = -1
 
-    t_sim = 6
+    t_sim = 3.8
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 

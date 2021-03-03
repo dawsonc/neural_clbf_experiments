@@ -82,7 +82,7 @@ with torch.no_grad():
     x_sim_start = torch.zeros(N_sim, n_dims) + 0.5
     x_sim_start[:, StateIndex.VZ] = -1
 
-    t_sim = 6
+    t_sim = 5
     delta_t = 0.001
     num_timesteps = int(t_sim // delta_t)
 
@@ -238,16 +238,20 @@ with torch.no_grad():
         color=rclbfqp_color,
         alpha=0.9)
     ax1.plot(t, t * 0.0 + checkpoint["safe_z"], c="g")
-    # ax1.text(8, 0.1 + checkpoint["safe_z"], "Safe", fontsize=20)
+    ax1.text(2.5, 0.1 + checkpoint["safe_z"], "Safe", fontsize=25)
     # ax1.plot(t, t * 0.0 + checkpoint["unsafe_z"], c="r")
     ax1.plot(t, t * 0.0 - 0.3, c="r")
-    # ax1.text(8, -0.5 + checkpoint["unsafe_z"], "Unsafe", fontsize=20)
+    ax1.text(2.5, -0.5 + checkpoint["unsafe_z"], "Unsafe", fontsize=25)
 
     ax1.set_xlabel("$t$")
     ax1.set_ylabel("$z$")
-    ax1.legend(loc="upper left")
+    ax1.legend(fontsize=25, loc="upper left")
     ax1.set_xlim([0, t_sim])
     ax1.set_ylim([-1, 2])
+
+    for item in ([ax1.title, ax1.xaxis.label, ax1.yaxis.label] +
+                 ax1.get_xticklabels() + ax1.get_yticklabels()):
+        item.set_fontsize(25)
 
     fig.tight_layout()
     plt.show()
